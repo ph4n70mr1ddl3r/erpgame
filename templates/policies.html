@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1 style="font-size: 1.5rem; font-weight: 700; margin-bottom: 0.25rem;">Company Policies</h1>
+<p style="color: #64748b; margin-bottom: 1rem;">Define your company's strategic direction. Changes take effect next quarter.</p>
+
+{% if messages.len() > 0 %}
+<div style="margin-bottom: 1rem;">
+    {% for msg in messages %}
+    <div class="message msg-info">{{ msg }}</div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<form action="/policies" method="POST">
+<div style="display: grid; gap: 1rem;">
+    <div class="card" style="padding: 1rem;">
+        <h3 style="font-size: 0.9rem; font-weight: 600; margin-bottom: 0.5rem; color: #f59e0b;">&#128176; Pricing Strategy</h3>
+        <p style="font-size: 0.8rem; color: #64748b; margin-bottom: 0.5rem;">Current: <span style="color: #e2e8f0;">{{ pricing }}</span></p>
+        <select name="pricing" style="width: 100%;">
+            <option value="budget" {% if pricing_key == "budget" %}selected{% endif %}>Budget (Low prices, high volume)</option>
+            <option value="competitive" {% if pricing_key == "competitive" %}selected{% endif %}>Competitive (Market-rate pricing)</option>
+            <option value="premium" {% if pricing_key == "premium" %}selected{% endif %}>Premium (Higher margins, select clientele)</option>
+            <option value="dynamic" {% if pricing_key == "dynamic" %}selected{% endif %}>Dynamic (AI-adjusted pricing)</option>
+        </select>
+    </div>
+
+    <div class="card" style="padding: 1rem;">
+        <h3 style="font-size: 0.9rem; font-weight: 600; margin-bottom: 0.5rem; color: #f59e0b;">&#128101; HR Policy</h3>
+        <p style="font-size: 0.8rem; color: #64748b; margin-bottom: 0.5rem;">Current: <span style="color: #e2e8f0;">{{ hr }}</span></p>
+        <select name="hr" style="width: 100%;">
+            <option value="minimal" {% if hr_key == "minimal" %}selected{% endif %}>Minimal (Basic compensation)</option>
+            <option value="standard" {% if hr_key == "standard" %}selected{% endif %}>Standard (Market-rate benefits)</option>
+            <option value="generous" {% if hr_key == "generous" %}selected{% endif %}>Generous (Above-market compensation)</option>
+            <option value="elite" {% if hr_key == "elite" %}selected{% endif %}>Elite (Top-tier benefits &amp; perks)</option>
+        </select>
+    </div>
+
+    <div class="card" style="padding: 1rem;">
+        <h3 style="font-size: 0.9rem; font-weight: 600; margin-bottom: 0.5rem; color: #f59e0b;">&#127959; Expansion Strategy</h3>
+        <p style="font-size: 0.8rem; color: #64748b; margin-bottom: 0.5rem;">Current: <span style="color: #e2e8f0;">{{ expansion }}</span></p>
+        <select name="expansion" style="width: 100%;">
+            <option value="conservative" {% if expansion_key == "conservative" %}selected{% endif %}>Conservative (Careful, profitable growth)</option>
+            <option value="moderate" {% if expansion_key == "moderate" %}selected{% endif %}>Moderate (Balanced expansion)</option>
+            <option value="aggressive" {% if expansion_key == "aggressive" %}selected{% endif %}>Aggressive (Rapid expansion)</option>
+            <option value="blitz" {% if expansion_key == "blitz" %}selected{% endif %}>Blitz (Maximum speed expansion)</option>
+        </select>
+    </div>
+
+    <div class="card" style="padding: 1rem;">
+        <h3 style="font-size: 0.9rem; font-weight: 600; margin-bottom: 0.5rem; color: #f59e0b;">&#127873; Customer Service</h3>
+        <p style="font-size: 0.8rem; color: #64748b; margin-bottom: 0.5rem;">Current: <span style="color: #e2e8f0;">{{ customer_service }}</span></p>
+        <select name="customer_service" style="width: 100%;">
+            <option value="basic" {% if customer_service_key == "basic" %}selected{% endif %}>Basic (Self-service focus)</option>
+            <option value="good" {% if customer_service_key == "good" %}selected{% endif %}>Good (Trained staff available)</option>
+            <option value="excellent" {% if customer_service_key == "excellent" %}selected{% endif %}>Excellent (Dedicated support teams)</option>
+            <option value="whiteglove" {% if customer_service_key == "whiteglove" %}selected{% endif %}>White Glove (Premium concierge service)</option>
+        </select>
+    </div>
+
+    <div class="card" style="padding: 1rem;">
+        <h3 style="font-size: 0.9rem; font-weight: 600; margin-bottom: 0.5rem; color: #f59e0b;">&#128227; Marketing Strategy</h3>
+        <p style="font-size: 0.8rem; color: #64748b; margin-bottom: 0.5rem;">Current: <span style="color: #e2e8f0;">{{ marketing }}</span></p>
+        <select name="marketing" style="width: 100%;">
+            <option value="lowkey" {% if marketing_key == "lowkey" %}selected{% endif %}>Low Key (Minimal marketing spend)</option>
+            <option value="moderate" {% if marketing_key == "moderate" %}selected{% endif %}>Moderate (Regular campaigns)</option>
+            <option value="heavy" {% if marketing_key == "heavy" %}selected{% endif %}>Heavy (Large-scale campaigns)</option>
+            <option value="aggressive" {% if marketing_key == "aggressive" %}selected{% endif %}>Aggressive (Maximum market presence)</option>
+        </select>
+    </div>
+
+    <div class="card" style="padding: 1rem;">
+        <h3 style="font-size: 0.9rem; font-weight: 600; margin-bottom: 0.5rem; color: #f59e0b;">&#128230; Inventory Policy</h3>
+        <p style="font-size: 0.8rem; color: #64748b; margin-bottom: 0.5rem;">Current: <span style="color: #e2e8f0;">{{ inventory }}</span></p>
+        <select name="inventory" style="width: 100%;">
+            <option value="lean" {% if inventory_key == "lean" %}selected{% endif %}>Lean (Minimal stock, risk of stockouts)</option>
+            <option value="standard" {% if inventory_key == "standard" %}selected{% endif %}>Standard (Balanced inventory levels)</option>
+            <option value="buffered" {% if inventory_key == "buffered" %}selected{% endif %}>Buffered (Extra safety stock)</option>
+            <option value="abundant" {% if inventory_key == "abundant" %}selected{% endif %}>Abundant (Maximum availability)</option>
+        </select>
+    </div>
+
+    <div style="text-align: center;">
+        <button type="submit" class="btn-primary" style="padding: 0.75rem 2rem; font-size: 1rem;">Update All Policies</button>
+    </div>
+</div>
+</form>
+
+{% endblock %}

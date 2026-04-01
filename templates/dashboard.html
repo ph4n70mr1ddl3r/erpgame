@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div style="margin-bottom: 1.5rem;">
+    <h1 style="font-size: 1.75rem; font-weight: 700; margin-bottom: 0.25rem;">{{ company_name }} &mdash; CEO Dashboard</h1>
+    <p style="color: #64748b;">{{ current_quarter }} | Next: {{ next_quarter }}</p>
+</div>
+
+{% if messages.len() > 0 %}
+<div class="card" style="padding: 1rem; margin-bottom: 1.5rem;">
+    {% for msg in messages %}
+    <div class="message {% if msg.starts_with("[EVENT]") %}msg-event{% else if msg.starts_with("GAME OVER") || msg.starts_with("CONGRATULATIONS") %}msg-error{% else if msg.starts_with("Cannot") || msg.contains("error") %}msg-error{% else %}msg-info{% endif %}">
+        {{ msg }}
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+    <div class="stat-card">
+        <div style="color: #64748b; font-size: 0.8rem; text-transform: uppercase;">Cash on Hand</div>
+        <div style="font-size: 1.5rem; font-weight: 700; color: {% if cash.starts_with("-") %}#ef4444{% else %}#22c55e{% endif %};">{{ cash }}</div>
+        <div style="font-size: 0.75rem; color: #64748b;">{{ cash_full }}</div>
+    </div>
+    <div class="stat-card">
+        <div style="color: #64748b; font-size: 0.8rem; text-transform: uppercase;">Last Q Revenue</div>
+        <div style="font-size: 1.5rem; font-weight: 700; color: #3b82f6;">{{ quarterly_revenue }}</div>
+    </div>
+    <div class="stat-card">
+        <div style="color: #64748b; font-size: 0.8rem; text-transform: uppercase;">Last Q Expenses</div>
+        <div style="font-size: 1.5rem; font-weight: 700; color: #f59e0b;">{{ quarterly_expenses }}</div>
+    </div>
+    <div class="stat-card">
+        <div style="color: #64748b; font-size: 0.8rem; text-transform: uppercase;">Last Q Profit</div>
+        <div style="font-size: 1.5rem; font-weight: 700; color: {% if quarterly_profit.starts_with("-") %}#ef4444{% else %}#22c55e{% endif %};">{{ quarterly_profit }}</div>
+    </div>
+    <div class="stat-card">
+        <div style="color: #64748b; font-size: 0.8rem; text-transform: uppercase;">Company Value</div>
+        <div style="font-size: 1.5rem; font-weight: 700; color: #a78bfa;">{{ company_value }}</div>
+    </div>
+</div>
+
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+    <div class="stat-card">
+        <div style="color: #64748b; font-size: 0.75rem; text-transform: uppercase;">Market Share</div>
+        <div style="font-size: 1.25rem; font-weight: 600;">{{ market_share }}</div>
+        <div class="progress-bar"><div class="progress-fill" style="width: {{ market_share }}; background: #3b82f6;"></div></div>
+    </div>
+    <div class="stat-card">
+        <div style="color: #64748b; font-size: 0.75rem; text-transform: uppercase;">Customer Satisfaction</div>
+        <div style="font-size: 1.25rem; font-weight: 600;">{{ customer_satisfaction }}</div>
+        <div class="progress-bar"><div class="progress-fill" style="width: {{ customer_satisfaction }}; background: #22c55e;"></div></div>
+    </div>
+    <div class="stat-card">
+        <div style="color: #64748b; font-size: 0.75rem; text-transform: uppercase;">Employee Satisfaction</div>
+        <div style="font-size: 1.25rem; font-weight: 600;">{{ employee_satisfaction }}</div>
+        <div class="progress-bar"><div class="progress-fill" style="width: {{ employee_satisfaction }}; background: #f59e0b;"></div></div>
+    </div>
+    <div class="stat-card">
+        <div style="color: #64748b; font-size: 0.75rem; text-transform: uppercase;">Brand Reputation</div>
+        <div style="font-size: 1.25rem; font-weight: 600;">{{ brand_reputation }}</div>
+        <div class="progress-bar"><div class="progress-fill" style="width: {{ brand_reputation }}; background: #a78bfa;"></div></div>
+    </div>
+    <div class="stat-card">
+        <div style="color: #64748b; font-size: 0.75rem; text-transform: uppercase;">Stores / Employees</div>
+        <div style="font-size: 1.25rem; font-weight: 600;">{{ store_count }} / {{ employee_count }}</div>
+        <div style="font-size: 0.75rem; color: #64748b;">{{ executive_count }} executives</div>
+    </div>
+</div>
+
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem;">
+    <div class="card" style="padding: 1rem;">
+        <h3 style="font-size: 0.9rem; font-weight: 600; margin-bottom: 0.75rem; color: #94a3b8;">PHILIPPINE ECONOMY</h3>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; font-size: 0.85rem;">
+            <div>GDP Growth: <span style="color: #22c55e;">{{ economy_gdp }}</span></div>
+            <div>Inflation: <span style="color: #f59e0b;">{{ economy_inflation }}</span></div>
+            <div>Interest Rate: <span style="color: #f59e0b;">{{ economy_interest }}</span></div>
+            <div>Season: <span style="color: #3b82f6;">{{ seasonal_multiplier }}</span></div>
+        </div>
+        <div style="margin-top: 0.5rem; font-size: 0.8rem; color: #64748b;">{{ economy_description }}</div>
+    </div>
+    <div class="card" style="padding: 1rem;">
+        <h3 style="font-size: 0.9rem; font-weight: 600; margin-bottom: 0.75rem; color: #94a3b8;">MARKET CONDITIONS</h3>
+        <div style="font-size: 0.85rem;">
+            <div style="margin-bottom: 0.25rem;">{{ competition_description }}</div>
+            <div style="color: #64748b;">Win condition: Reach ₱10B+ company value</div>
+            <div style="color: #64748b;">Lose condition: Cash drops below -₱10M</div>
+        </div>
+    </div>
+</div>
+
+<div style="text-align: center; margin-bottom: 1.5rem;">
+    {% if game_over %}
+    <a href="/new-game" class="btn-warning" style="font-size: 1.1rem; padding: 0.75rem 2rem;">Start New Game</a>
+    {% else %}
+    <form action="/tick" method="POST" style="display: inline;">
+        <button type="submit" class="btn-warning" style="font-size: 1.1rem; padding: 0.75rem 2rem;">
+            &#9654; Advance to {{ next_quarter }}
+        </button>
+    </form>
+    {% endif %}
+</div>
+
+{% if financial_history.len() > 0 %}
+<div class="card" style="padding: 1rem; overflow-x: auto;">
+    <h3 style="font-size: 0.9rem; font-weight: 600; margin-bottom: 0.75rem; color: #94a3b8;">QUARTERLY FINANCIAL HISTORY</h3>
+    <table>
+        <thead>
+            <tr>
+                <th>Quarter</th><th>Revenue</th><th>Expenses</th><th>Profit</th><th>Tax</th><th>Stores</th><th>Employees</th><th>Share</th><th>Satisfaction</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in financial_history %}
+            <tr>
+                <td>{{ row.quarter }}</td>
+                <td>{{ row.revenue }}</td>
+                <td>{{ row.expenses }}</td>
+                <td class="{{ row.profit_class }}">{{ row.profit }}</td>
+                <td>{{ row.tax }}</td>
+                <td>{{ row.stores }}</td>
+                <td>{{ row.employees }}</td>
+                <td>{{ row.market_share }}</td>
+                <td>{{ row.satisfaction }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+
+{% endblock %}

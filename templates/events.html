@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1 style="font-size: 1.5rem; font-weight: 700; margin-bottom: 0.25rem;">Event Log</h1>
+<p style="color: #64748b; margin-bottom: 1rem;">Major events that have affected your company.</p>
+
+{% if messages.len() > 0 %}
+<div style="margin-bottom: 1rem;">
+    {% for msg in messages %}
+    <div class="message msg-info">{{ msg }}</div>
+    {% endfor %}
+</div>
+{% endif %}
+
+{% if events.len() > 0 %}
+<div class="card" style="padding: 1rem;">
+    <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+        {% for e in events %}
+        <div style="background: #0f172a; border-radius: 0.5rem; padding: 0.75rem; border: 1px solid #334155; display: flex; align-items: start; gap: 0.75rem;">
+            <div style="font-size: 1.5rem; flex-shrink: 0;">{{ e.icon }}</div>
+            <div style="flex: 1;">
+                <div style="font-size: 0.9rem; font-weight: 600;">{{ e.title }}</div>
+            </div>
+            <div style="color: #64748b; font-size: 0.75rem; flex-shrink: 0;">{{ e.quarter }}</div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% else %}
+<div class="card" style="padding: 2rem; text-align: center;">
+    <p style="color: #64748b;">No events yet. Advance quarters to see events unfold.</p>
+</div>
+{% endif %}
+
+{% endblock %}

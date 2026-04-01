@@ -1,0 +1,582 @@
+use rand::Rng;
+
+use super::state::*;
+
+fn find_exec_skill(state: &GameState, position: ExecutivePosition) -> Option<f64> {
+    state
+        .executives
+        .iter()
+        .find(|e| e.position == position)
+        .map(|e| e.skill)
+}
+
+pub fn simulate_quarter(state: &mut GameState) {
+    state.messages.clear();
+    state.current_quarter += 1;
+    if state.current_quarter > 4 {
+        state.current_quarter = 1;
+        state.current_year += 1;
+    }
+
+    let mut rng = rand::thread_rng();
+    let quarter = state.current_quarter;
+
+    update_economy(state, &mut rng);
+    update_seasonality(state, quarter);
+    process_store_construction(state);
+
+    let operating_count = state.operating_store_count();
+    let cfo_skill = find_exec_skill(state, ExecutivePosition::CFO);
+    let coo_skill = find_exec_skill(state, ExecutivePosition::COO);
+    let cmo_skill = find_exec_skill(state, ExecutivePosition::CMO);
+    let cto_skill = find_exec_skill(state, ExecutivePosition::CTO);
+
+    let total_revenue = calculate_revenue(
+        state,
+        &mut rng,
+        operating_count,
+        cfo_skill,
+        coo_skill,
+        cmo_skill,
+    );
+    let total_expenses = calculate_expenses(state, operating_count, cto_skill);
+    let loan_payments = process_loans(state);
+    let event_impacts = process_random_events(state, &mut rng);
+    process_executive_decisions(state, &mut rng);
+    update_employees(state, &mut rng);
+    update_company_metrics(state, &mut rng);
+
+    let gross_profit = total_revenue - total_expenses;
+    let net_profit = gross_profit - loan_payments - event_impacts.cash_impact;
+    let tax = if net_profit > 0.0 {
+        net_profit * state.economy.corporate_tax_rate / 100.0
+    } else {
+        0.0
+    };
+    let final_profit = net_profit - tax;
+
+    state.company.cash += final_profit;
+    state.company.total_revenue += total_revenue;
+    state.company.total_expenses += total_expenses;
+    state.company.total_profit += final_profit;
+
+    state.company.company_value = state.company.cash
+        + state
+            .stores
+            .iter()
+            .filter(|s| s.status == StoreStatus::Operating)
+            .map(|s| s.store_type.opening_cost() * 0.7)
+            .sum::<f64>()
+        + if total_revenue > 0.0 {
+            total_revenue * 4.0
+        } else {
+            0.0
+        };
+
+    let report = QuarterlyReport {
+        quarter,
+        year: state.current_year,
+        revenue: total_revenue,
+        expenses: total_expenses,
+        profit: final_profit,
+        tax_paid: tax,
+        cash_flow: final_profit - loan_payments,
+        store_count: state.operating_store_count(),
+        employee_count: state.employees.total_count,
+        market_share: state.company.market_share,
+        customer_satisfaction: state.company.customer_satisfaction,
+    };
+    state.financial_history.push(report);
+
+    if state.company.cash < -10_000_000.0 {
+        state.game_over = true;
+        state.messages.push(
+            "GAME OVER: Your company has gone bankrupt! The board of directors has seized control."
+                .into(),
+        );
+    }
+
+    if state.company.company_value >= 10_000_000_000.0 {
+        state.game_over = true;
+        state.messages.push(
+            "CONGRATULATIONS: Bahay Depot has become a P10B+ company! You are a legendary CEO!"
+                .into(),
+        );
+    }
+
+    let summary = format!(
+        "Q{} {} | Revenue: {} | Expenses: {} | Profit: {} | Cash: {}",
+        quarter,
+        state.current_year,
+        format_currency(total_revenue),
+        format_currency(total_expenses),
+        format_currency(final_profit),
+        format_currency(state.company.cash),
+    );
+    state.messages.push(summary);
+}
+
+fn update_economy(state: &mut GameState, rng: &mut rand::rngs::ThreadRng) {
+    let e = &mut state.economy;
+    e.gdp_growth_rate = (e.gdp_growth_rate + rng.gen_range(-0.8..0.8)).clamp(2.0, 9.0);
+    e.inflation_rate = (e.inflation_rate + rng.gen_range(-0.5..0.5)).clamp(1.0, 8.0);
+    e.interest_rate = (e.interest_rate + rng.gen_range(-0.3..0.3)).clamp(3.0, 8.0);
+    e.construction_index = (e.construction_index + rng.gen_range(-5.0..5.0)).clamp(30.0, 100.0);
+    e.consumer_confidence = (e.consumer_confidence + rng.gen_range(-4.0..4.0)).clamp(20.0, 95.0);
+    e.peso_usd_rate = (e.peso_usd_rate + rng.gen_range(-1.0..1.0)).clamp(45.0, 65.0);
+    e.minimum_wage_daily = (e.minimum_wage_daily + rng.gen_range(-5.0..15.0)).clamp(500.0, 800.0);
+
+    if state.current_quarter == 1 {
+        e.minimum_wage_daily += rng.gen_range(10.0..30.0);
+        state.messages.push(format!(
+            "Government raised minimum wage to P{:.0}/day",
+            e.minimum_wage_daily
+        ));
+    }
+}
+
+fn update_seasonality(state: &mut GameState, quarter: i32) {
+    state.market.seasonal_multiplier = match quarter {
+        1 => 0.85,
+        2 => 1.0,
+        3 => 1.05,
+        4 => 1.25,
+        _ => 1.0,
+    };
+}
+
+fn process_store_construction(state: &mut GameState) {
+    for store in &mut state.stores {
+        if store.status == StoreStatus::UnderConstruction {
+            store.construction_quarters_left -= 1;
+            if store.construction_quarters_left <= 0 {
+                store.status = StoreStatus::Operating;
+                store.opened_quarter = state.current_quarter;
+                store.opened_year = state.current_year;
+                state
+                    .messages
+                    .push(format!("{} in {} is now OPEN!", store.name, store.city));
+            }
+        }
+        if store.status == StoreStatus::Operating {
+            store.age_quarters += 1;
+        }
+    }
+}
+
+fn calculate_revenue(
+    state: &mut GameState,
+    rng: &mut rand::rngs::ThreadRng,
+    _operating_count: u32,
+    cfo_skill: Option<f64>,
+    coo_skill: Option<f64>,
+    cmo_skill: Option<f64>,
+) -> f64 {
+    let economy_mult = 1.0 + (state.economy.gdp_growth_rate - 4.0) / 100.0;
+    let construction_mult = 1.0 + (state.economy.construction_index - 60.0) / 200.0;
+    let confidence_mult = 1.0 + (state.economy.consumer_confidence - 60.0) / 200.0;
+    let season_mult = state.market.seasonal_multiplier;
+    let demand_mult = state.market.demand_trend;
+
+    let pricing_mult = match state.policies.pricing {
+        PricingPolicy::Budget => 1.25,
+        PricingPolicy::Competitive => 1.1,
+        PricingPolicy::Premium => 0.85,
+        PricingPolicy::Dynamic => 1.05 + rng.gen_range(-0.1..0.1),
+    };
+
+    let service_mult = match state.policies.customer_service {
+        CustomerServicePolicy::Basic => 0.9,
+        CustomerServicePolicy::Good => 1.0,
+        CustomerServicePolicy::Excellent => 1.1,
+        CustomerServicePolicy::WhiteGlove => 1.2,
+    };
+
+    let marketing_mult = match state.policies.marketing {
+        MarketingPolicy::LowKey => 0.85,
+        MarketingPolicy::Moderate => 1.0,
+        MarketingPolicy::Heavy => 1.15,
+        MarketingPolicy::Aggressive => 1.3,
+    };
+
+    let morale_mult = 0.9 + (state.company.employee_satisfaction / 100.0) * 0.3;
+    let reputation_mult = 0.8 + (state.company.brand_reputation / 100.0) * 0.4;
+
+    let cfo_bonus = 1.0 + cfo_skill.unwrap_or(0.0) * 0.002;
+    let coo_bonus = 1.0 + coo_skill.unwrap_or(0.0) * 0.003;
+    let cmo_bonus = 1.0 + cmo_skill.unwrap_or(0.0) * 0.003;
+
+    let mut total_revenue = 0.0;
+
+    for store in &mut state.stores {
+        if store.status != StoreStatus::Operating {
+            store.quarterly_revenue = 0.0;
+            continue;
+        }
+
+        let revenue_per_sqm_base = store.region.rent_multiplier() * 3000.0;
+        let base_revenue = store.size_sqm as f64 * revenue_per_sqm_base;
+
+        let growth_mult = if store.age_quarters < 4 {
+            0.7 + store.age_quarters as f64 * 0.1
+        } else {
+            1.0
+        };
+        let competitor_penalty = if store_has_competitor_nearby(store) {
+            0.85
+        } else {
+            1.0
+        };
+
+        let noise = rng.gen_range(0.95..1.05);
+
+        let store_revenue = base_revenue
+            * economy_mult
+            * construction_mult
+            * confidence_mult
+            * season_mult
+            * demand_mult
+            * pricing_mult
+            * service_mult
+            * marketing_mult
+            * morale_mult
+            * reputation_mult
+            * growth_mult
+            * competitor_penalty
+            * cfo_bonus
+            * coo_bonus
+            * cmo_bonus
+            * noise;
+
+        let store_revenue = store_revenue.max(0.0);
+        store.quarterly_revenue = store_revenue;
+        store.customer_count = (store_revenue / 500.0 * rng.gen_range(0.8..1.2)) as u32;
+
+        total_revenue += store_revenue;
+    }
+
+    total_revenue
+}
+
+fn store_has_competitor_nearby(store: &Store) -> bool {
+    get_available_cities()
+        .iter()
+        .any(|c| c.name == store.city && c.has_competitor)
+}
+
+fn calculate_expenses(state: &mut GameState, operating_count: u32, cto_skill: Option<f64>) -> f64 {
+    let avg_salary = if state.employees.total_count > 0 {
+        state.employees.monthly_payroll / state.employees.total_count as f64
+    } else {
+        15000.0
+    };
+
+    let marketing_total = operating_count as f64
+        * match state.policies.marketing {
+            MarketingPolicy::LowKey => 100_000.0,
+            MarketingPolicy::Moderate => 300_000.0,
+            MarketingPolicy::Heavy => 600_000.0,
+            MarketingPolicy::Aggressive => 1_000_000.0,
+        };
+
+    let cto_cost_reduction = 1.0 - cto_skill.unwrap_or(0.0) * 0.001;
+
+    let mut total_expenses = 0.0;
+
+    for store in &mut state.stores {
+        if store.status == StoreStatus::Closed {
+            store.quarterly_expenses = 0.0;
+            continue;
+        }
+
+        let cities = get_available_cities();
+        let rent_rate = cities
+            .iter()
+            .find(|c| c.name == store.city)
+            .map(|c| c.rent_per_sqm)
+            .unwrap_or(500.0);
+
+        let monthly_rent = store.size_sqm as f64 * rent_rate;
+        let quarterly_rent = monthly_rent * 3.0;
+
+        let employee_count = if store.status == StoreStatus::UnderConstruction {
+            (store.size_sqm as f64 * 0.005) as u32
+        } else {
+            (store.size_sqm as f64 * store.store_type.employees_per_sqm()) as u32
+        };
+        store.employee_count = employee_count;
+
+        let quarterly_payroll = employee_count as f64 * avg_salary * 3.0;
+
+        let utilities = store.size_sqm as f64 * 150.0 * 3.0;
+
+        let inventory_cost = if store.status == StoreStatus::Operating {
+            store.quarterly_revenue
+                * match state.policies.inventory {
+                    InventoryPolicy::Lean => 0.35,
+                    InventoryPolicy::Standard => 0.42,
+                    InventoryPolicy::Buffered => 0.50,
+                    InventoryPolicy::Abundant => 0.60,
+                }
+        } else {
+            0.0
+        };
+
+        let maintenance = store.size_sqm as f64 * 80.0 * 3.0;
+
+        let service_cost = match state.policies.customer_service {
+            CustomerServicePolicy::Basic => 0.0,
+            CustomerServicePolicy::Good => employee_count as f64 * 2000.0 * 3.0,
+            CustomerServicePolicy::Excellent => employee_count as f64 * 4000.0 * 3.0,
+            CustomerServicePolicy::WhiteGlove => employee_count as f64 * 7000.0 * 3.0,
+        };
+
+        let hr_cost = match state.policies.hr {
+            HrPolicy::Minimal => 0.0,
+            HrPolicy::Standard => employee_count as f64 * 1000.0 * 3.0,
+            HrPolicy::Generous => employee_count as f64 * 2500.0 * 3.0,
+            HrPolicy::Elite => employee_count as f64 * 5000.0 * 3.0,
+        };
+
+        let construction_cost = if store.status == StoreStatus::UnderConstruction {
+            store.store_type.opening_cost() / store.store_type.construction_quarters() as f64
+        } else {
+            0.0
+        };
+
+        let mut store_expenses = quarterly_rent
+            + quarterly_payroll
+            + utilities
+            + inventory_cost
+            + maintenance
+            + marketing_total / operating_count.max(1) as f64
+            + service_cost
+            + hr_cost
+            + construction_cost;
+
+        store_expenses *= cto_cost_reduction;
+
+        store.quarterly_expenses = store_expenses;
+        total_expenses += store_expenses;
+    }
+
+    let executive_payroll: f64 = state
+        .executives
+        .iter()
+        .map(|e| e.salary_monthly * 3.0)
+        .sum();
+    total_expenses += executive_payroll;
+
+    let corporate_overhead = 500_000.0 * 3.0;
+    total_expenses += corporate_overhead;
+
+    let total_store_employees: u32 = state.stores.iter().map(|s| s.employee_count).sum();
+    let admin_overhead = (total_store_employees as f64 * 0.1) * 20_000.0 * 3.0;
+    total_expenses += admin_overhead;
+
+    total_expenses
+}
+
+fn process_loans(state: &mut GameState) -> f64 {
+    let mut total_payment = 0.0;
+    let mut i = 0;
+    while i < state.company.loans.len() {
+        let loan = &mut state.company.loans[i];
+        let interest = loan.remaining * loan.interest_rate / 100.0 / 4.0;
+        let principal = loan.quarterly_payment - interest;
+        loan.remaining -= principal;
+        total_payment += loan.quarterly_payment;
+        loan.quarters_remaining -= 1;
+        if loan.quarters_remaining <= 0 || loan.remaining <= 0.0 {
+            state.company.loans.remove(i);
+            state.messages.push("A loan has been fully repaid.".into());
+        } else {
+            i += 1;
+        }
+    }
+    total_payment
+}
+
+fn process_executive_decisions(state: &mut GameState, rng: &mut rand::rngs::ThreadRng) {
+    for exec in &mut state.executives {
+        exec.tenure_quarters += 1;
+        exec.performance_rating =
+            (exec.performance_rating + rng.gen_range(-5.0..5.0)).clamp(30.0, 100.0);
+        exec.morale = (exec.morale + rng.gen_range(-3.0..3.0)).clamp(20.0, 100.0);
+        exec.loyalty = (exec.loyalty + rng.gen_range(-2.0..2.0)).clamp(10.0, 100.0);
+
+        if exec.morale < 30.0 && rng.gen_bool(0.1) {
+            state.messages.push(format!(
+                "{} ({}) is considering leaving due to low morale!",
+                exec.name,
+                exec.position.short_title()
+            ));
+        }
+
+        if exec.tenure_quarters % 4 == 0 {
+            let raise = exec.salary_monthly * rng.gen_range(0.02..0.08);
+            exec.salary_monthly += raise;
+            state.messages.push(format!(
+                "{} got a raise to {}/month",
+                exec.name,
+                format_currency_full(exec.salary_monthly)
+            ));
+        }
+    }
+
+    super::executive_ai::generate_recommendations(state);
+}
+
+fn update_employees(state: &mut GameState, rng: &mut rand::rngs::ThreadRng) {
+    let mut total_employees: u32 = state.stores.iter().map(|s| s.employee_count).sum();
+    total_employees += state.executives.len() as u32;
+    total_employees += (total_employees as f64 * 0.1) as u32;
+
+    state.employees.total_count = total_employees;
+
+    let base_salary = state.economy.minimum_wage_daily * 22.0;
+    let salary_multiplier = match state.policies.hr {
+        HrPolicy::Minimal => 1.1,
+        HrPolicy::Standard => 1.3,
+        HrPolicy::Generous => 1.5,
+        HrPolicy::Elite => 1.8,
+    };
+
+    let avg_salary = base_salary * salary_multiplier;
+    state.employees.monthly_payroll = total_employees as f64 * avg_salary;
+
+    let hr_morale_base = match state.policies.hr {
+        HrPolicy::Minimal => 35.0,
+        HrPolicy::Standard => 55.0,
+        HrPolicy::Generous => 72.0,
+        HrPolicy::Elite => 88.0,
+    };
+
+    let performance_factor = if state.company.total_profit > 0.0 {
+        5.0
+    } else {
+        -5.0
+    };
+    let exec_bonus = if state.is_executive_hired(ExecutivePosition::CHRO) {
+        let chro = state
+            .executives
+            .iter()
+            .find(|e| e.position == ExecutivePosition::CHRO)
+            .unwrap();
+        chro.skill * 0.1
+    } else {
+        0.0
+    };
+
+    let target_morale = (hr_morale_base + performance_factor + exec_bonus).clamp(20.0, 95.0);
+    state.employees.avg_morale += (target_morale - state.employees.avg_morale) * 0.2;
+    state.employees.avg_morale =
+        (state.employees.avg_morale + rng.gen_range(-3.0..3.0)).clamp(15.0, 98.0);
+    state.company.employee_satisfaction = state.employees.avg_morale;
+
+    state.employees.avg_skill =
+        (state.employees.avg_skill + rng.gen_range(-1.0..2.0)).clamp(30.0, 90.0);
+
+    let base_turnover = match state.policies.hr {
+        HrPolicy::Minimal => 12.0,
+        HrPolicy::Standard => 7.0,
+        HrPolicy::Generous => 4.0,
+        HrPolicy::Elite => 2.0,
+    };
+    let morale_turnover = if state.employees.avg_morale < 40.0 {
+        8.0
+    } else {
+        0.0
+    };
+    let turnover: f64 = base_turnover + morale_turnover + rng.gen_range(-2.0..2.0);
+    state.employees.turnover_rate = turnover.clamp(1.0, 25.0);
+
+    let hiring_costs = turnover / 100.0 * total_employees as f64 * avg_salary * 2.0;
+    state.company.cash -= hiring_costs;
+}
+
+fn update_company_metrics(state: &mut GameState, rng: &mut rand::rngs::ThreadRng) {
+    let operating = state.operating_store_count();
+
+    if operating > 0 && !state.financial_history.is_empty() {
+        let avg_satisfaction: f64 = state
+            .stores
+            .iter()
+            .filter(|s| s.status == StoreStatus::Operating)
+            .map(|s| s.satisfaction)
+            .sum::<f64>()
+            / operating as f64;
+        state.company.customer_satisfaction =
+            (state.company.customer_satisfaction * 0.7 + avg_satisfaction * 0.3).clamp(10.0, 100.0);
+    }
+
+    let market_base = operating as f64 * 1.5;
+    let brand_bonus = state.company.brand_reputation / 100.0 * 2.0;
+    let marketing_bonus = match state.policies.marketing {
+        MarketingPolicy::LowKey => 0.5,
+        MarketingPolicy::Moderate => 1.0,
+        MarketingPolicy::Heavy => 1.8,
+        MarketingPolicy::Aggressive => 2.5,
+    };
+    let competitor_pressure = state.market.competitor_strength / 100.0;
+    let target_share =
+        (market_base + brand_bonus + marketing_bonus - competitor_pressure).clamp(0.5, 35.0);
+    state.company.market_share += (target_share - state.company.market_share) * 0.15;
+    state.company.market_share =
+        (state.company.market_share + rng.gen_range(-0.2..0.2)).clamp(0.1, 40.0);
+
+    let rep_change = match state.policies.customer_service {
+        CustomerServicePolicy::Basic => -0.5,
+        CustomerServicePolicy::Good => 0.5,
+        CustomerServicePolicy::Excellent => 1.5,
+        CustomerServicePolicy::WhiteGlove => 2.5,
+    };
+    state.company.brand_reputation =
+        (state.company.brand_reputation + rep_change + rng.gen_range(-1.0..1.5)).clamp(10.0, 100.0);
+
+    state.market.demand_trend =
+        (state.market.demand_trend + rng.gen_range(-0.03..0.03)).clamp(0.8, 1.3);
+    state.market.competitor_count =
+        (state.market.competitor_count as i32 + rng.gen_range(-1..2)).max(3) as u32;
+    state.market.competitor_strength =
+        (state.market.competitor_strength + rng.gen_range(-3.0..3.0)).clamp(50.0, 100.0);
+
+    for store in &mut state.stores {
+        if store.status == StoreStatus::Operating {
+            store.satisfaction =
+                (state.company.customer_satisfaction + rng.gen_range(-5.0..5.0)).clamp(20.0, 100.0);
+        }
+    }
+}
+
+fn process_random_events(state: &mut GameState, rng: &mut rand::rngs::ThreadRng) -> EventImpact {
+    use super::events::generate_events;
+    let events = generate_events(state, rng);
+    let mut total_impact = EventImpact {
+        cash_impact: 0.0,
+        revenue_impact: 0.0,
+        expense_impact: 0.0,
+        morale_impact: 0.0,
+        reputation_impact: 0.0,
+        satisfaction_impact: 0.0,
+    };
+
+    for event in events {
+        state.event_log.insert(0, event.clone());
+        if state.event_log.len() > 50 {
+            state.event_log.pop();
+        }
+        state.messages.push(format!("[EVENT] {}", event.title));
+        total_impact.cash_impact += event.impact.cash_impact;
+        state.company.cash += event.impact.cash_impact;
+        state.company.brand_reputation =
+            (state.company.brand_reputation + event.impact.reputation_impact).clamp(5.0, 100.0);
+        state.company.employee_satisfaction =
+            (state.company.employee_satisfaction + event.impact.morale_impact).clamp(5.0, 100.0);
+        state.company.customer_satisfaction = (state.company.customer_satisfaction
+            + event.impact.satisfaction_impact)
+            .clamp(5.0, 100.0);
+    }
+
+    total_impact
+}

@@ -1,0 +1,788 @@
+use rand::Rng;
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::sync::LazyLock;
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GameState {
+    pub company: Company,
+    pub stores: Vec<Store>,
+    pub executives: Vec<Executive>,
+    pub employees: EmployeePool,
+    pub policies: Policies,
+    pub economy: EconomyState,
+    pub market: MarketState,
+    pub financial_history: Vec<QuarterlyReport>,
+    pub event_log: Vec<GameEvent>,
+    pub current_quarter: i32,
+    pub current_year: i32,
+    pub game_over: bool,
+    pub messages: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Company {
+    pub name: String,
+    pub cash: f64,
+    pub total_revenue: f64,
+    pub total_expenses: f64,
+    pub total_profit: f64,
+    pub company_value: f64,
+    pub brand_reputation: f64,
+    pub customer_satisfaction: f64,
+    pub employee_satisfaction: f64,
+    pub market_share: f64,
+    pub founded_quarter: i32,
+    pub founded_year: i32,
+    pub loans: Vec<Loan>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Loan {
+    pub id: String,
+    pub amount: f64,
+    pub interest_rate: f64,
+    pub remaining: f64,
+    pub quarterly_payment: f64,
+    pub quarters_remaining: i32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Store {
+    pub id: String,
+    pub name: String,
+    pub city: String,
+    pub region: Region,
+    pub store_type: StoreType,
+    pub size_sqm: u32,
+    pub status: StoreStatus,
+    pub quarterly_revenue: f64,
+    pub quarterly_expenses: f64,
+    pub customer_count: u32,
+    pub employee_count: u32,
+    pub satisfaction: f64,
+    pub age_quarters: i32,
+    pub construction_quarters_left: i32,
+    pub opened_quarter: i32,
+    pub opened_year: i32,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
+pub enum Region {
+    MetroManila,
+    Luzon,
+    Visayas,
+    Mindanao,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
+pub enum StoreType {
+    Express,
+    Standard,
+    Mega,
+    Depot,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
+pub enum StoreStatus {
+    Operating,
+    UnderConstruction,
+    Closed,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Executive {
+    pub id: String,
+    pub name: String,
+    pub position: ExecutivePosition,
+    pub skill: f64,
+    pub salary_monthly: f64,
+    pub morale: f64,
+    pub loyalty: f64,
+    pub tenure_quarters: i32,
+    pub performance_rating: f64,
+    pub recommendation: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Hash, Eq)]
+pub enum ExecutivePosition {
+    CFO,
+    COO,
+    CMO,
+    CTO,
+    CHRO,
+    CSCO,
+}
+
+impl ExecutivePosition {
+    pub fn title(&self) -> &str {
+        match self {
+            ExecutivePosition::CFO => "Chief Financial Officer",
+            ExecutivePosition::COO => "Chief Operations Officer",
+            ExecutivePosition::CMO => "Chief Marketing Officer",
+            ExecutivePosition::CTO => "Chief Technology Officer",
+            ExecutivePosition::CHRO => "Chief Human Resources Officer",
+            ExecutivePosition::CSCO => "Chief Supply Chain Officer",
+        }
+    }
+
+    pub fn short_title(&self) -> &str {
+        match self {
+            ExecutivePosition::CFO => "CFO",
+            ExecutivePosition::COO => "COO",
+            ExecutivePosition::CMO => "CMO",
+            ExecutivePosition::CTO => "CTO",
+            ExecutivePosition::CHRO => "CHRO",
+            ExecutivePosition::CSCO => "CSCO",
+        }
+    }
+
+    pub fn salary_range(&self) -> (f64, f64) {
+        match self {
+            ExecutivePosition::CFO => (250_000.0, 500_000.0),
+            ExecutivePosition::COO => (250_000.0, 500_000.0),
+            ExecutivePosition::CMO => (200_000.0, 400_000.0),
+            ExecutivePosition::CTO => (200_000.0, 400_000.0),
+            ExecutivePosition::CHRO => (180_000.0, 350_000.0),
+            ExecutivePosition::CSCO => (200_000.0, 400_000.0),
+        }
+    }
+
+    pub fn all_positions() -> Vec<ExecutivePosition> {
+        vec![
+            ExecutivePosition::CFO,
+            ExecutivePosition::COO,
+            ExecutivePosition::CMO,
+            ExecutivePosition::CTO,
+            ExecutivePosition::CHRO,
+            ExecutivePosition::CSCO,
+        ]
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EmployeePool {
+    pub total_count: u32,
+    pub monthly_payroll: f64,
+    pub avg_morale: f64,
+    pub avg_skill: f64,
+    pub turnover_rate: f64,
+    pub department_breakdown: HashMap<String, u32>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Policies {
+    pub pricing: PricingPolicy,
+    pub hr: HrPolicy,
+    pub expansion: ExpansionPolicy,
+    pub customer_service: CustomerServicePolicy,
+    pub marketing: MarketingPolicy,
+    pub inventory: InventoryPolicy,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub enum PricingPolicy {
+    Budget,
+    Competitive,
+    Premium,
+    Dynamic,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub enum HrPolicy {
+    Minimal,
+    Standard,
+    Generous,
+    Elite,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
+pub enum ExpansionPolicy {
+    Conservative,
+    Moderate,
+    Aggressive,
+    Blitz,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub enum CustomerServicePolicy {
+    Basic,
+    Good,
+    Excellent,
+    WhiteGlove,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub enum MarketingPolicy {
+    LowKey,
+    Moderate,
+    Heavy,
+    Aggressive,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub enum InventoryPolicy {
+    Lean,
+    Standard,
+    Buffered,
+    Abundant,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EconomyState {
+    pub gdp_growth_rate: f64,
+    pub inflation_rate: f64,
+    pub interest_rate: f64,
+    pub construction_index: f64,
+    pub consumer_confidence: f64,
+    pub peso_usd_rate: f64,
+    pub minimum_wage_daily: f64,
+    pub corporate_tax_rate: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MarketState {
+    pub total_market_size: f64,
+    pub competitor_count: u32,
+    pub competitor_strength: f64,
+    pub seasonal_multiplier: f64,
+    pub demand_trend: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct QuarterlyReport {
+    pub quarter: i32,
+    pub year: i32,
+    pub revenue: f64,
+    pub expenses: f64,
+    pub profit: f64,
+    pub tax_paid: f64,
+    pub cash_flow: f64,
+    pub store_count: u32,
+    pub employee_count: u32,
+    pub market_share: f64,
+    pub customer_satisfaction: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GameEvent {
+    pub id: String,
+    pub title: String,
+    pub description: String,
+    pub event_type: EventType,
+    pub impact: EventImpact,
+    pub quarter: i32,
+    pub year: i32,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub enum EventType {
+    NaturalDisaster,
+    Economic,
+    Competition,
+    Employee,
+    Marketing,
+    Regulation,
+    SupplyChain,
+    Positive,
+    Negative,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EventImpact {
+    pub cash_impact: f64,
+    pub revenue_impact: f64,
+    pub expense_impact: f64,
+    pub morale_impact: f64,
+    pub reputation_impact: f64,
+    pub satisfaction_impact: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CityData {
+    pub name: String,
+    pub region: Region,
+    pub rent_per_sqm: f64,
+    pub demand_factor: f64,
+    pub population: u32,
+    pub has_competitor: bool,
+}
+
+impl StoreType {
+    pub fn default_size(&self) -> u32 {
+        match self {
+            StoreType::Express => 800,
+            StoreType::Standard => 3500,
+            StoreType::Mega => 12000,
+            StoreType::Depot => 18000,
+        }
+    }
+
+    pub fn opening_cost(&self) -> f64 {
+        match self {
+            StoreType::Express => 8_000_000.0,
+            StoreType::Standard => 25_000_000.0,
+            StoreType::Mega => 80_000_000.0,
+            StoreType::Depot => 120_000_000.0,
+        }
+    }
+
+    pub fn construction_quarters(&self) -> i32 {
+        match self {
+            StoreType::Express => 1,
+            StoreType::Standard => 2,
+            StoreType::Mega => 3,
+            StoreType::Depot => 4,
+        }
+    }
+
+    pub fn employees_per_sqm(&self) -> f64 {
+        match self {
+            StoreType::Express => 0.025,
+            StoreType::Standard => 0.02,
+            StoreType::Mega => 0.015,
+            StoreType::Depot => 0.012,
+        }
+    }
+}
+
+impl Region {
+    pub fn rent_multiplier(&self) -> f64 {
+        match self {
+            Region::MetroManila => 1.5,
+            Region::Luzon => 1.0,
+            Region::Visayas => 0.8,
+            Region::Mindanao => 0.7,
+        }
+    }
+}
+
+pub fn get_available_cities() -> &'static [CityData] {
+    static CITIES: LazyLock<Vec<CityData>> = LazyLock::new(|| {
+        vec![
+            CityData {
+                name: "Makati".into(),
+                region: Region::MetroManila,
+                rent_per_sqm: 1200.0,
+                demand_factor: 1.4,
+                population: 630_000,
+                has_competitor: true,
+            },
+            CityData {
+                name: "BGC Taguig".into(),
+                region: Region::MetroManila,
+                rent_per_sqm: 1100.0,
+                demand_factor: 1.35,
+                population: 800_000,
+                has_competitor: true,
+            },
+            CityData {
+                name: "Quezon City".into(),
+                region: Region::MetroManila,
+                rent_per_sqm: 800.0,
+                demand_factor: 1.3,
+                population: 3_000_000,
+                has_competitor: true,
+            },
+            CityData {
+                name: "Pasig".into(),
+                region: Region::MetroManila,
+                rent_per_sqm: 750.0,
+                demand_factor: 1.2,
+                population: 800_000,
+                has_competitor: false,
+            },
+            CityData {
+                name: "Manila".into(),
+                region: Region::MetroManila,
+                rent_per_sqm: 700.0,
+                demand_factor: 1.1,
+                population: 1_800_000,
+                has_competitor: true,
+            },
+            CityData {
+                name: "Caloocan".into(),
+                region: Region::MetroManila,
+                rent_per_sqm: 400.0,
+                demand_factor: 0.9,
+                population: 1_600_000,
+                has_competitor: false,
+            },
+            CityData {
+                name: "Parañaque".into(),
+                region: Region::MetroManila,
+                rent_per_sqm: 650.0,
+                demand_factor: 1.15,
+                population: 700_000,
+                has_competitor: false,
+            },
+            CityData {
+                name: "Las Piñas".into(),
+                region: Region::MetroManila,
+                rent_per_sqm: 500.0,
+                demand_factor: 1.0,
+                population: 600_000,
+                has_competitor: false,
+            },
+            CityData {
+                name: "Cebu City".into(),
+                region: Region::Visayas,
+                rent_per_sqm: 600.0,
+                demand_factor: 1.2,
+                population: 1_000_000,
+                has_competitor: true,
+            },
+            CityData {
+                name: "Mandaue".into(),
+                region: Region::Visayas,
+                rent_per_sqm: 400.0,
+                demand_factor: 1.0,
+                population: 400_000,
+                has_competitor: false,
+            },
+            CityData {
+                name: "Davao City".into(),
+                region: Region::Mindanao,
+                rent_per_sqm: 450.0,
+                demand_factor: 1.1,
+                population: 1_800_000,
+                has_competitor: true,
+            },
+            CityData {
+                name: "Cagayan de Oro".into(),
+                region: Region::Mindanao,
+                rent_per_sqm: 350.0,
+                demand_factor: 0.9,
+                population: 700_000,
+                has_competitor: false,
+            },
+            CityData {
+                name: "Iloilo City".into(),
+                region: Region::Visayas,
+                rent_per_sqm: 380.0,
+                demand_factor: 0.95,
+                population: 500_000,
+                has_competitor: false,
+            },
+            CityData {
+                name: "Baguio City".into(),
+                region: Region::Luzon,
+                rent_per_sqm: 500.0,
+                demand_factor: 0.85,
+                population: 370_000,
+                has_competitor: false,
+            },
+            CityData {
+                name: "Clark Angeles".into(),
+                region: Region::Luzon,
+                rent_per_sqm: 400.0,
+                demand_factor: 0.9,
+                population: 500_000,
+                has_competitor: false,
+            },
+            CityData {
+                name: "Angeles".into(),
+                region: Region::Luzon,
+                rent_per_sqm: 380.0,
+                demand_factor: 0.85,
+                population: 450_000,
+                has_competitor: false,
+            },
+            CityData {
+                name: "San Fernando Pampanga".into(),
+                region: Region::Luzon,
+                rent_per_sqm: 350.0,
+                demand_factor: 0.8,
+                population: 350_000,
+                has_competitor: false,
+            },
+            CityData {
+                name: "General Santos".into(),
+                region: Region::Mindanao,
+                rent_per_sqm: 300.0,
+                demand_factor: 0.75,
+                population: 600_000,
+                has_competitor: false,
+            },
+            CityData {
+                name: "Zamboanga City".into(),
+                region: Region::Mindanao,
+                rent_per_sqm: 280.0,
+                demand_factor: 0.7,
+                population: 900_000,
+                has_competitor: false,
+            },
+            CityData {
+                name: "Batangas City".into(),
+                region: Region::Luzon,
+                rent_per_sqm: 350.0,
+                demand_factor: 0.85,
+                population: 330_000,
+                has_competitor: false,
+            },
+            CityData {
+                name: "Lipa City".into(),
+                region: Region::Luzon,
+                rent_per_sqm: 320.0,
+                demand_factor: 0.8,
+                population: 280_000,
+                has_competitor: false,
+            },
+            CityData {
+                name: "Sta. Rosa Laguna".into(),
+                region: Region::Luzon,
+                rent_per_sqm: 450.0,
+                demand_factor: 0.95,
+                population: 500_000,
+                has_competitor: false,
+            },
+            CityData {
+                name: "Tagaytay".into(),
+                region: Region::Luzon,
+                rent_per_sqm: 500.0,
+                demand_factor: 0.8,
+                population: 70_000,
+                has_competitor: false,
+            },
+            CityData {
+                name: "Antipolo".into(),
+                region: Region::MetroManila,
+                rent_per_sqm: 400.0,
+                demand_factor: 0.95,
+                population: 800_000,
+                has_competitor: false,
+            },
+        ]
+    });
+    &CITIES
+}
+
+pub fn generate_executive_name(rng: &mut rand::rngs::ThreadRng) -> String {
+    let first_names = [
+        "Maria",
+        "Jose",
+        "Ana",
+        "Juan",
+        "Carmen",
+        "Ricardo",
+        "Elena",
+        "Miguel",
+        "Rosa",
+        "Antonio",
+        "Luz",
+        "Fernando",
+        "Grace",
+        "Roberto",
+        "Isabel",
+        "Daniel",
+        "Teresa",
+        "Alberto",
+        "Patricia",
+        "Eduardo",
+        "Concepcion",
+        "Ramon",
+        "Victoria",
+        "Alejandro",
+        "Cristina",
+        "Francisco",
+        "Nora",
+        "Manuel",
+        "Lourdes",
+        "Arturo",
+        "Socorro",
+        "Gregorio",
+        "Remedios",
+        "Ernesto",
+        "Milagros",
+        "Rafael",
+        "Purificacion",
+        "Adolfo",
+        "Charito",
+    ];
+    let last_names = [
+        "Santos",
+        "Reyes",
+        "Cruz",
+        "Garcia",
+        "Mendoza",
+        "Tan",
+        "Lim",
+        "Lopez",
+        "Gonzales",
+        "Bautista",
+        "Vergara",
+        "Aquino",
+        "Roxas",
+        "Ong",
+        "Chua",
+        "Co",
+        "Sy",
+        "Dizon",
+        "Navarro",
+        "Villanueva",
+        "Fernandez",
+        "Del Rosario",
+        "Santiago",
+        "Rivera",
+        "Torres",
+        "Ramos",
+        "Flores",
+        "Hernandez",
+        "Molina",
+        "Sanchez",
+        "David",
+        "Carillo",
+        "Dela Cruz",
+        "Paredes",
+        "Aguirre",
+        "Yanson",
+        "Gokongwei",
+        "Sy-Cip",
+        "Ang",
+        "Razon",
+    ];
+    let first = first_names[rng.gen_range(0..first_names.len())];
+    let last = last_names[rng.gen_range(0..last_names.len())];
+    format!("{} {}", first, last)
+}
+
+pub fn format_currency(amount: f64) -> String {
+    if amount.abs() >= 1_000_000_000.0 {
+        format!("₱{:.1}B", amount / 1_000_000_000.0)
+    } else if amount.abs() >= 1_000_000.0 {
+        format!("₱{:.1}M", amount / 1_000_000.0)
+    } else if amount.abs() >= 1_000.0 {
+        format!("₱{:.0}K", amount / 1_000.0)
+    } else {
+        format!("₱{:.0}", amount)
+    }
+}
+
+pub fn format_currency_full(amount: f64) -> String {
+    let abs = amount.abs() as u64;
+    let s = abs.to_string();
+    let chars: Vec<char> = s.chars().collect();
+    let mut result = String::new();
+    for (i, c) in chars.iter().enumerate() {
+        if i > 0 && (chars.len() - i) % 3 == 0 {
+            result.push(',');
+        }
+        result.push(*c);
+    }
+    if amount < 0.0 {
+        format!("-P{}", result)
+    } else {
+        format!("P{}", result)
+    }
+}
+
+pub fn pct(value: f64) -> String {
+    format!("{:.1}%", value)
+}
+
+impl GameState {
+    pub fn new() -> Self {
+        let starting_cash = 80_000_000.0;
+
+        let store = Store {
+            id: uuid::Uuid::new_v4().to_string(),
+            name: "Bahay Depot Quezon City".into(),
+            city: "Quezon City".into(),
+            region: Region::MetroManila,
+            store_type: StoreType::Standard,
+            size_sqm: 3500,
+            status: StoreStatus::Operating,
+            quarterly_revenue: 0.0,
+            quarterly_expenses: 0.0,
+            customer_count: 0,
+            employee_count: 70,
+            satisfaction: 70.0,
+            age_quarters: 0,
+            construction_quarters_left: 0,
+            opened_quarter: 1,
+            opened_year: 2025,
+        };
+
+        GameState {
+            company: Company {
+                name: "Bahay Depot Inc.".into(),
+                cash: starting_cash,
+                total_revenue: 0.0,
+                total_expenses: 0.0,
+                total_profit: 0.0,
+                company_value: starting_cash,
+                brand_reputation: 50.0,
+                customer_satisfaction: 65.0,
+                employee_satisfaction: 60.0,
+                market_share: 2.0,
+                founded_quarter: 1,
+                founded_year: 2025,
+                loans: vec![],
+            },
+            stores: vec![store],
+            executives: vec![],
+            employees: EmployeePool {
+                total_count: 70,
+                monthly_payroll: 1_200_000.0,
+                avg_morale: 60.0,
+                avg_skill: 50.0,
+                turnover_rate: 5.0,
+                department_breakdown: HashMap::from([
+                    ("Store Operations".into(), 55),
+                    ("Warehouse".into(), 8),
+                    ("Administration".into(), 4),
+                    ("IT".into(), 2),
+                    ("Marketing".into(), 1),
+                ]),
+            },
+            policies: Policies {
+                pricing: PricingPolicy::Competitive,
+                hr: HrPolicy::Standard,
+                expansion: ExpansionPolicy::Moderate,
+                customer_service: CustomerServicePolicy::Good,
+                marketing: MarketingPolicy::Moderate,
+                inventory: InventoryPolicy::Standard,
+            },
+            economy: EconomyState {
+                gdp_growth_rate: 5.8,
+                inflation_rate: 3.5,
+                interest_rate: 5.5,
+                construction_index: 65.0,
+                consumer_confidence: 60.0,
+                peso_usd_rate: 55.5,
+                minimum_wage_daily: 610.0,
+                corporate_tax_rate: 25.0,
+            },
+            market: MarketState {
+                total_market_size: 500_000_000_000.0,
+                competitor_count: 5,
+                competitor_strength: 80.0,
+                seasonal_multiplier: 1.0,
+                demand_trend: 1.0,
+            },
+            financial_history: vec![],
+            event_log: vec![],
+            current_quarter: 1,
+            current_year: 2025,
+            game_over: false,
+            messages: vec!["Welcome to Bahay Depot! You are the new CEO. Your first store is open in Quezon City. Set your policies, hire your executive team, and grow the company!".into()],
+        }
+    }
+
+    pub fn operating_store_count(&self) -> u32 {
+        self.stores
+            .iter()
+            .filter(|s| s.status == StoreStatus::Operating)
+            .count() as u32
+    }
+
+    pub fn is_executive_hired(&self, position: ExecutivePosition) -> bool {
+        self.executives.iter().any(|e| e.position == position)
+    }
+
+    pub fn advance_quarter_label(&self) -> String {
+        let q = self.current_quarter;
+        let y = self.current_year;
+        format!("Q{} {}", q, y)
+    }
+}

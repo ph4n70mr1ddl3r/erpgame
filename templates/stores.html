@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1 style="font-size: 1.5rem; font-weight: 700; margin-bottom: 0.25rem;">Store Management</h1>
+<p style="color: #64748b; margin-bottom: 1rem;">Cash available: <span style="color: #22c55e;">{{ cash }}</span></p>
+
+{% if messages.len() > 0 %}
+<div style="margin-bottom: 1rem;">
+    {% for msg in messages %}
+    <div class="message {% if msg.starts_with("Cannot") %}msg-error{% else %}msg-info{% endif %}">{{ msg }}</div>
+    {% endfor %}
+</div>
+{% endif %}
+
+{% if store_rows.len() > 0 %}
+<div class="card" style="padding: 1rem; margin-bottom: 1.5rem; overflow-x: auto;">
+    <h3 style="font-size: 0.9rem; font-weight: 600; margin-bottom: 0.75rem; color: #94a3b8;">YOUR STORES</h3>
+    <table>
+        <thead>
+            <tr>
+                <th>Store</th><th>City</th><th>Type</th><th>Size</th><th>Status</th>
+                <th>Q Revenue</th><th>Q Expenses</th><th>Q Profit</th><th>Staff</th><th>Age</th><th></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for s in store_rows %}
+            <tr>
+                <td style="font-weight: 600;">{{ s.name }}</td>
+                <td>{{ s.city }} <span style="color: #64748b; font-size: 0.75rem;">({{ s.region }})</span></td>
+                <td>{{ s.store_type }}</td>
+                <td>{{ s.size_sqm }} sqm</td>
+                <td class="{{ s.status_class }}">{{ s.status }}</td>
+                <td style="color: #3b82f6;">{{ s.quarterly_revenue }}</td>
+                <td style="color: #f59e0b;">{{ s.quarterly_expenses }}</td>
+                <td style="color: {% if s.quarterly_profit.starts_with("-") %}#ef4444{% else %}#22c55e{% endif %};">{{ s.quarterly_profit }}</td>
+                <td>{{ s.employees }}</td>
+                <td>{{ s.age }}</td>
+                <td>
+                    {% if s.can_close %}
+                    <form action="/stores/{{ s.id }}/close" method="POST" style="display: inline;" onsubmit="return confirm('Close this store? You will receive 40% of opening cost.');">
+                        <button type="submit" class="btn-danger" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;">Close</button>
+                    </form>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+
+{% if cities.len() > 0 %}
+<div class="card" style="padding: 1rem; margin-bottom: 1.5rem;">
+    <h3 style="font-size: 0.9rem; font-weight: 600; margin-bottom: 0.75rem; color: #94a3b8;">OPEN NEW STORE</h3>
+    <form action="/stores/open" method="POST" style="display: grid; grid-template-columns: 1fr 1fr 1fr auto; gap: 0.75rem; align-items: end;">
+        <div>
+            <label style="font-size: 0.8rem; color: #94a3b8; display: block; margin-bottom: 0.25rem;">City</label>
+            <select name="city" required>
+                {% for c in cities %}
+                <option value="{{ c.name }}">{{ c.name }} ({{ c.region }}) - Rent: {{ c.rent }} - Demand: {{ c.demand }}{% if c.competitor == "Yes" %} [Competitor]{% endif %}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label style="font-size: 0.8rem; color: #94a3b8; display: block; margin-bottom: 0.25rem;">Store Type</label>
+            <select name="store_type" required onchange="document.getElementById('cost-display').textContent = this.options[this.selectedIndex].dataset.cost">
+                {% for t in store_types %}
+                <option value="{{ t.key }}" data-cost="{{ t.cost }}">{{ t.label }} - {{ t.size }} sqm - {{ t.cost }} ({{ t.construction }}Q build)</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label style="font-size: 0.8rem; color: #94a3b8; display: block; margin-bottom: 0.25rem;">Store Name (optional)</label>
+            <input type="text" name="store_name" placeholder="Auto-generated if blank">
+        </div>
+        <button type="submit" class="btn-success" onclick="return confirm('Open this store? Funds will be deducted immediately.');">Open Store</button>
+    </form>
+    <div style="margin-top: 0.5rem; font-size: 0.8rem; color: #64748b;">Construction takes 1-4 quarters depending on store type. Stores generate revenue once operational.</div>
+</div>
+{% else %}
+<div class="card" style="padding: 1rem; margin-bottom: 1.5rem;">
+    <p style="color: #64748b;">All available cities have stores. Expand further is not possible in this version.</p>
+</div>
+{% endif %}
+
+<div class="card" style="padding: 1rem;">
+    <h3 style="font-size: 0.9rem; font-weight: 600; margin-bottom: 0.5rem; color: #94a3b8;">STORE TYPE GUIDE</h3>
+    <table>
+        <thead><tr><th>Type</th><th>Size</th><th>Cost</th><th>Build Time</th><th>Best For</th></tr></thead>
+        <tbody>
+            <tr><td>Express</td><td>800 sqm</td><td>₱8M</td><td>1 quarter</td><td>Residential neighborhoods</td></tr>
+            <tr><td>Standard</td><td>3,500 sqm</td><td>₱25M</td><td>2 quarters</td><td>Urban areas, good all-rounder</td></tr>
+            <tr><td>Mega</td><td>12,000 sqm</td><td>₱80M</td><td>3 quarters</td><td>Major cities, high demand</td></tr>
+            <tr><td>Depot</td><td>18,000 sqm</td><td>₱120M</td><td>4 quarters</td><td>Industrial zones, bulk sales</td></tr>
+        </tbody>
+    </table>
+</div>
+
+{% endblock %}

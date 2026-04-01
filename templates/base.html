@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bahay Depot - CEO Simulator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { background: #0f172a; color: #e2e8f0; font-family: 'Segoe UI', system-ui, sans-serif; }
+        .nav-link { transition: all 0.15s; }
+        .nav-link:hover, .nav-link.active { background: #334155; }
+        .card { background: #1e293b; border: 1px solid #334155; border-radius: 0.75rem; }
+        .stat-card { background: #1e293b; border: 1px solid #334155; border-radius: 0.75rem; padding: 1rem; }
+        .btn-primary { background: #3b82f6; color: white; padding: 0.5rem 1rem; border-radius: 0.5rem; border: none; cursor: pointer; transition: all 0.15s; }
+        .btn-primary:hover { background: #2563eb; }
+        .btn-danger { background: #ef4444; color: white; padding: 0.5rem 1rem; border-radius: 0.5rem; border: none; cursor: pointer; transition: all 0.15s; }
+        .btn-danger:hover { background: #dc2626; }
+        .btn-success { background: #22c55e; color: white; padding: 0.5rem 1rem; border-radius: 0.5rem; border: none; cursor: pointer; transition: all 0.15s; }
+        .btn-success:hover { background: #16a34a; }
+        .btn-warning { background: #f59e0b; color: #0f172a; padding: 0.5rem 1rem; border-radius: 0.5rem; border: none; cursor: pointer; transition: all 0.15s; font-weight: 600; }
+        .btn-warning:hover { background: #d97706; }
+        select, input[type="text"], input[type="number"] {
+            background: #0f172a; border: 1px solid #475569; color: #e2e8f0; padding: 0.5rem; border-radius: 0.5rem; width: 100%;
+        }
+        select:focus, input:focus { outline: none; border-color: #3b82f6; }
+        table { width: 100%; border-collapse: collapse; }
+        th { text-align: left; padding: 0.75rem; color: #94a3b8; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid #334155; }
+        td { padding: 0.75rem; border-bottom: 1px solid #1e293b; font-size: 0.9rem; }
+        tr:hover td { background: #1e293b; }
+        .message { padding: 0.5rem 0.75rem; border-radius: 0.5rem; margin-bottom: 0.25rem; font-size: 0.85rem; }
+        .msg-info { background: #1e3a5f; border-left: 3px solid #3b82f6; }
+        .msg-event { background: #3b2e1e; border-left: 3px solid #f59e0b; }
+        .msg-error { background: #3b1e1e; border-left: 3px solid #ef4444; }
+        .msg-success { background: #1e3b1e; border-left: 3px solid #22c55e; }
+        .progress-bar { background: #0f172a; border-radius: 0.5rem; height: 0.5rem; overflow: hidden; }
+        .progress-fill { height: 100%; border-radius: 0.5rem; transition: width 0.3s; }
+        @media (max-width: 768px) {
+            .sidebar { display: none !important; }
+            .sidebar.open { display: flex !important; position: fixed; z-index: 50; top: 0; left: 0; width: 250px; height: 100vh; background: #1e293b; flex-direction: column; }
+            .mobile-menu { display: block !important; }
+            .main-content { margin-left: 0 !important; }
+        }
+    </style>
+</head>
+<body>
+    <div style="display: flex; min-height: 100vh;">
+        <aside class="sidebar" style="width: 240px; background: #1e293b; border-right: 1px solid #334155; display: flex; flex-direction: column; position: fixed; top: 0; left: 0; height: 100vh; z-index: 40;">
+            <div style="padding: 1.25rem; border-bottom: 1px solid #334155;">
+                <div style="font-size: 1.25rem; font-weight: 700; color: #f59e0b;">BAHAY DEPOT</div>
+                <div style="font-size: 0.75rem; color: #64748b;">CEO Simulator</div>
+                <div style="margin-top: 0.5rem; font-size: 0.8rem; color: #94a3b8;">{{ current_quarter }}</div>
+                <div id="sidebar-cash" style="font-size: 0.8rem; color: #22c55e; font-weight: 600;"></div>
+            </div>
+            <nav style="flex: 1; padding: 0.5rem;">
+                <a href="/" class="nav-link {% if active_page == "dashboard" %}active{% endif %}" style="display: block; padding: 0.6rem 1rem; border-radius: 0.5rem; color: #e2e8f0; text-decoration: none; font-size: 0.9rem; margin-bottom: 0.15rem;">
+                    &#128200; Dashboard
+                </a>
+                <a href="/stores" class="nav-link {% if active_page == "stores" %}active{% endif %}" style="display: block; padding: 0.6rem 1rem; border-radius: 0.5rem; color: #e2e8f0; text-decoration: none; font-size: 0.9rem; margin-bottom: 0.15rem;">
+                    &#127970; Stores
+                </a>
+                <a href="/executives" class="nav-link {% if active_page == "executives" %}active{% endif %}" style="display: block; padding: 0.6rem 1rem; border-radius: 0.5rem; color: #e2e8f0; text-decoration: none; font-size: 0.9rem; margin-bottom: 0.15rem;">
+                    &#128101; Executives
+                </a>
+                <a href="/policies" class="nav-link {% if active_page == "policies" %}active{% endif %}" style="display: block; padding: 0.6rem 1rem; border-radius: 0.5rem; color: #e2e8f0; text-decoration: none; font-size: 0.9rem; margin-bottom: 0.15rem;">
+                    &#128220; Policies
+                </a>
+                <a href="/finances" class="nav-link {% if active_page == "finances" %}active{% endif %}" style="display: block; padding: 0.6rem 1rem; border-radius: 0.5rem; color: #e2e8f0; text-decoration: none; font-size: 0.9rem; margin-bottom: 0.15rem;">
+                    &#128176; Finances
+                </a>
+                <a href="/events" class="nav-link {% if active_page == "events" %}active{% endif %}" style="display: block; padding: 0.6rem 1rem; border-radius: 0.5rem; color: #e2e8f0; text-decoration: none; font-size: 0.9rem; margin-bottom: 0.15rem;">
+                    &#128240; Events
+                </a>
+            </nav>
+            <div style="padding: 0.75rem; border-top: 1px solid #334155;">
+                <a href="/new-game" style="display: block; text-align: center; padding: 0.5rem; border-radius: 0.5rem; background: #334155; color: #94a3b8; text-decoration: none; font-size: 0.8rem;">New Game</a>
+            </div>
+        </aside>
+
+        <main class="main-content" style="margin-left: 240px; flex: 1; padding: 1.5rem; max-width: 100%;">
+            <button class="mobile-menu" onclick="document.querySelector('.sidebar').classList.toggle('open')" style="display: none; margin-bottom: 1rem; background: #334155; color: #e2e8f0; border: none; padding: 0.5rem 1rem; border-radius: 0.5rem; cursor: pointer;">&#9776; Menu</button>
+            {% block content %}{% endblock %}
+        </main>
+    </div>
+</body>
+</html>

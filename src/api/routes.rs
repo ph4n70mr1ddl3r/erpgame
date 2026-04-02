@@ -245,7 +245,7 @@ pub async fn finances_page(State(state): State<AppState>) -> Response {
     let financial_history: Vec<FinancialRow> = s.financial_history.iter().rev().take(50).map(report_to_row).collect();
     let loans: Vec<LoanInfo> = s.company.loans.iter().map(|l| LoanInfo { id: l.id.clone(), amount: format_currency_full(l.amount), remaining: format_currency_full(l.remaining), rate: pct(l.interest_rate), quarterly_payment: format_currency_full(l.quarterly_payment), quarters_left: l.quarters_remaining }).collect();
     let total_loan_remaining: f64 = s.company.loans.iter().map(|l| l.remaining).sum();
-    let max_loan = (s.company.company_value * 0.5).max(10_000_000.0);
+    let max_loan = (s.company.company_value * 0.5).max(crate::game::state::MINIMUM_LOAN_AMOUNT);
     let suggested_rate = s.economy.interest_rate + 1.5;
 
     crate::templates::FinancesTemplate {
@@ -265,7 +265,7 @@ pub async fn take_loan(State(state): State<AppState>, Form(form): Form<LoanForm>
     let amount: f64 = form.amount.parse().unwrap_or(0.0);
     let quarters: i32 = form.quarters.parse().unwrap_or(8);
     if amount <= 0.0 || quarters <= 0 { state.messages.push("Invalid loan parameters.".into()); return Redirect::to("/finances").into_response(); }
-    let max_loan = (state.company.company_value * 0.5).max(10_000_000.0);
+    let max_loan = (state.company.company_value * 0.5).max(crate::game::state::MINIMUM_LOAN_AMOUNT);
     if amount > max_loan { state.messages.push(format!("Loan amount {} exceeds maximum of {}.", format_currency(amount), format_currency(max_loan))); return Redirect::to("/finances").into_response(); }
     let rate = state.economy.interest_rate + 1.5;
     let total_with_interest = amount * (1.0 + rate / 100.0 * quarters as f64 / 4.0);

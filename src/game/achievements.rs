@@ -282,7 +282,7 @@ pub fn check_achievements(state: &mut GameState, last_revenue: f64) {
         state,
         "winner",
         &q_label,
-        state.company.company_value >= 10_000_000_000.0,
+        state.company.company_value >= super::state::WINNING_VALUE,
     );
 }
 

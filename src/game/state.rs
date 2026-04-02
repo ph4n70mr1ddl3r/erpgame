@@ -8,6 +8,13 @@ use super::board::BoardState;
 use super::competitors::default_competitors;
 use super::products::default_product_categories;
 
+// Game constants
+pub const STARTING_CASH: f64 = 80_000_000.0;
+pub const BANKRUPTCY_THRESHOLD: f64 = -10_000_000.0;
+pub const WINNING_VALUE: f64 = 10_000_000_000.0;
+pub const MINIMUM_LOAN_AMOUNT: f64 = 10_000_000.0;
+pub const MAX_EVENT_LOG_SIZE: usize = 50;
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GameState {
     pub company: Company,
@@ -852,7 +859,7 @@ pub fn pct(value: f64) -> String {
 
 impl GameState {
     pub fn new() -> Self {
-        let starting_cash = 80_000_000.0;
+        let starting_cash = STARTING_CASH;
 
         let store = Store {
             id: uuid::Uuid::new_v4().to_string(),
@@ -1002,7 +1009,7 @@ impl GameState {
                     year: event.year,
                 },
             );
-            if self.event_log.len() > 50 {
+            if self.event_log.len() > MAX_EVENT_LOG_SIZE {
                 self.event_log.pop();
             }
             self.messages
@@ -1022,7 +1029,7 @@ pub fn apply_event_effects(state: &mut GameState, effects: &EventEffects) {
         (state.company.customer_satisfaction + effects.satisfaction).clamp(5.0, 100.0);
 }
 
-fn category_to_event_type(cat: EventCategory) -> EventType {
+pub fn category_to_event_type(cat: EventCategory) -> EventType {
     match cat {
         EventCategory::Crisis => EventType::NaturalDisaster,
         EventCategory::Financial => EventType::Economic,

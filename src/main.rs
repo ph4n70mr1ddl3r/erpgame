@@ -45,7 +45,16 @@ async fn main() {
         .with_state(game_state)
         .nest_service("/static", ServeDir::new("static"));
 
-    let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
+    let listener = match tokio::net::TcpListener::bind("0.0.0.0:3000").await {
+        Ok(l) => l,
+        Err(e) => {
+            tracing::error!("Failed to bind to port 3000: {}", e);
+            std::process::exit(1);
+        }
+    };
     tracing::info!("Bahay Depot CEO Simulator running on http://localhost:3000");
-    axum::serve(listener, app).await.unwrap();
+    if let Err(e) = axum::serve(listener, app).await {
+        tracing::error!("Server error: {}", e);
+        std::process::exit(1);
+    }
 }

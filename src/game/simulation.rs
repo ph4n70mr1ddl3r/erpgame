@@ -130,7 +130,7 @@ pub fn simulate_quarter(state: &mut GameState) {
     };
     state.financial_history.push(report);
 
-    if state.company.cash < -10_000_000.0 {
+    if state.company.cash < super::state::BANKRUPTCY_THRESHOLD {
         state.game_over = true;
         state.messages.push(
             "GAME OVER: Your company has gone bankrupt! The board of directors has seized control."
@@ -142,7 +142,7 @@ pub fn simulate_quarter(state: &mut GameState) {
         state.game_over = true;
     }
 
-    if state.company.company_value >= 10_000_000_000.0 {
+    if state.company.company_value >= super::state::WINNING_VALUE {
         state.game_over = true;
         state.messages.push(
             "CONGRATULATIONS: Bahay Depot has become a P10B+ company! You are a legendary CEO!"
@@ -182,79 +182,56 @@ fn auto_resolve_event(
         .iter()
         .find(|e| e.position == delegate_pos)
         .map(|e| (e.position.short_title().to_string(), e.skill));
-    if let Some((exec_title, exec_skill)) = exec_info {
+
+    let (choice_idx, description_prefix) = if let Some((ref exec_title, exec_skill)) = exec_info {
         let best_idx = find_best_choice(&event.choices);
         let pick_best = rng.gen_bool(exec_skill / 100.0);
-        let choice_idx = if pick_best {
+        let idx = if pick_best {
             best_idx
         } else {
             rng.gen_range(0..event.choices.len())
         };
-        let choice = &event.choices[choice_idx];
-        apply_event_effects(state, &choice.effects);
-        state.decisions_delegated += 1;
-        state.event_log.insert(
-            0,
-            GameEvent {
-                id: event.id.clone(),
-                title: event.title.clone(),
-                description: format!("[DELEGATED] {} chose: {}", exec_title, choice.label),
-                event_type: category_to_event_type(event.category),
-                impact: EventImpact {
-                    cash_impact: choice.effects.cash,
-                    revenue_impact: choice.effects.revenue_modifier,
-                    expense_impact: choice.effects.expense_modifier,
-                    morale_impact: choice.effects.morale,
-                    reputation_impact: choice.effects.reputation,
-                    satisfaction_impact: choice.effects.satisfaction,
-                },
-                quarter: event.quarter,
-                year: event.year,
-            },
-        );
-        if state.event_log.len() > 50 {
-            state.event_log.pop();
-        }
-        state.messages.push(format!(
-            "[DELEGATED] {} decided on '{}': {}",
-            exec_title, event.title, choice.label
-        ));
+        (idx, format!("[DELEGATED] {} chose", exec_title))
     } else {
         let delegate_title = delegate_pos.short_title().to_string();
-        let choice_idx = rng.gen_range(0..event.choices.len());
-        let choice = &event.choices[choice_idx];
-        apply_event_effects(state, &choice.effects);
-        state.decisions_delegated += 1;
-        state.event_log.insert(
-            0,
-            GameEvent {
-                id: event.id.clone(),
-                title: event.title.clone(),
-                description: format!(
-                    "[AUTO] No {} hired, random: {}",
-                    delegate_title, choice.label
-                ),
-                event_type: category_to_event_type(event.category),
-                impact: EventImpact {
-                    cash_impact: choice.effects.cash,
-                    revenue_impact: choice.effects.revenue_modifier,
-                    expense_impact: choice.effects.expense_modifier,
-                    morale_impact: choice.effects.morale,
-                    reputation_impact: choice.effects.reputation,
-                    satisfaction_impact: choice.effects.satisfaction,
-                },
-                quarter: event.quarter,
-                year: event.year,
+        (
+            rng.gen_range(0..event.choices.len()),
+            format!("[AUTO] No {} hired, random", delegate_title),
+        )
+    };
+
+    let choice = &event.choices[choice_idx];
+    apply_event_effects(state, &choice.effects);
+    state.decisions_delegated += 1;
+
+    state.event_log.insert(
+        0,
+        GameEvent {
+            id: event.id.clone(),
+            title: event.title.clone(),
+            description: format!("{}: {}", description_prefix, choice.label),
+            event_type: category_to_event_type(event.category),
+            impact: EventImpact {
+                cash_impact: choice.effects.cash,
+                revenue_impact: choice.effects.revenue_modifier,
+                expense_impact: choice.effects.expense_modifier,
+                morale_impact: choice.effects.morale,
+                reputation_impact: choice.effects.reputation,
+                satisfaction_impact: choice.effects.satisfaction,
             },
-        );
-        if state.event_log.len() > 50 {
-            state.event_log.pop();
-        }
-        state.messages.push(format!(
-            "[AUTO] No {} hired, random decision on '{}': {}",
-            delegate_title, event.title, choice.label
-        ));
+            quarter: event.quarter,
+            year: event.year,
+        },
+    );
+
+    if state.event_log.len() > super::state::MAX_EVENT_LOG_SIZE {
+        state.event_log.pop();
     }
+
+    state.messages.push(format!(
+        "{} decision on '{}': {}",
+        description_prefix, event.title, choice.label
+    ));
 }
 
 fn find_best_choice(choices: &[EventChoice]) -> usize {
@@ -272,19 +249,6 @@ fn find_best_choice(choices: &[EventChoice]) -> usize {
         }
     }
     best_idx
-}
-
-fn category_to_event_type(cat: EventCategory) -> EventType {
-    match cat {
-        EventCategory::Crisis => EventType::NaturalDisaster,
-        EventCategory::Financial => EventType::Economic,
-        EventCategory::Marketing => EventType::Marketing,
-        EventCategory::HR => EventType::Employee,
-        EventCategory::SupplyChain => EventType::SupplyChain,
-        EventCategory::Competition => EventType::Competition,
-        EventCategory::Technology => EventType::Positive,
-        EventCategory::Regulation => EventType::Regulation,
-    }
 }
 
 fn update_economy(state: &mut GameState, rng: &mut rand::rngs::ThreadRng) {
@@ -620,17 +584,12 @@ fn update_employees(state: &mut GameState, rng: &mut rand::rngs::ThreadRng) {
     } else {
         -5.0
     };
-    let exec_bonus = if state.is_executive_hired(ExecutivePosition::CHRO) {
-        state
-            .executives
-            .iter()
-            .find(|e| e.position == ExecutivePosition::CHRO)
-            .unwrap()
-            .skill
-            * 0.1
-    } else {
-        0.0
-    };
+    let exec_bonus = state
+        .executives
+        .iter()
+        .find(|e| e.position == ExecutivePosition::CHRO)
+        .map(|e| e.skill * 0.1)
+        .unwrap_or(0.0);
     let target_morale = (hr_morale_base + performance_factor + exec_bonus).clamp(20.0, 95.0);
     state.employees.avg_morale += (target_morale - state.employees.avg_morale) * 0.2;
     state.employees.avg_morale =
@@ -727,7 +686,7 @@ fn process_random_events(state: &mut GameState, rng: &mut rand::rngs::ThreadRng)
 
     for event in events {
         state.event_log.insert(0, event.clone());
-        if state.event_log.len() > 50 {
+        if state.event_log.len() > super::state::MAX_EVENT_LOG_SIZE {
             state.event_log.pop();
         }
         state.messages.push(format!("[EVENT] {}", event.title));

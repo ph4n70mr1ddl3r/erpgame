@@ -138,7 +138,16 @@ pub async fn open_store(State(state): State<AppState>, Form(form): Form<NewStore
 
 pub async fn close_store(State(state): State<AppState>, Path(id): Path<String>) -> Response {
     let mut state = state.lock().await;
+    let operating_count = state.stores.iter().filter(|s| s.status == StoreStatus::Operating).count();
     if let Some(idx) = state.stores.iter().position(|s| s.id == id) {
+        if state.stores[idx].status != StoreStatus::Operating {
+            state.messages.push("Store is not operating.".into());
+            return Redirect::to("/stores").into_response();
+        }
+        if operating_count <= 1 {
+            state.messages.push("Cannot close your last operating store.".into());
+            return Redirect::to("/stores").into_response();
+        }
         let sell_value = state.stores[idx].store_type.opening_cost() * 0.4;
         let store_name = state.stores[idx].name.clone();
         let store_city = state.stores[idx].city.clone();
@@ -266,8 +275,8 @@ pub async fn take_loan(State(state): State<AppState>, Form(form): Form<LoanForm>
     let mut state = state.lock().await;
     let amount: f64 = form.amount.parse().unwrap_or(0.0);
     let quarters: i32 = form.quarters.parse().unwrap_or(8);
-    if !amount.is_finite() || !quarters.is_positive() {
-        state.messages.push("Invalid loan parameters.".into());
+    if !amount.is_finite() || amount < crate::game::state::MINIMUM_LOAN_AMOUNT || !quarters.is_positive() {
+        state.messages.push(format!("Invalid loan parameters. Minimum loan is {}.", format_currency(crate::game::state::MINIMUM_LOAN_AMOUNT)));
         return Redirect::to("/finances").into_response();
     }
     let max_loan = (state.company.company_value * 0.5).max(crate::game::state::MINIMUM_LOAN_AMOUNT);
@@ -364,14 +373,19 @@ pub async fn delegation_page(State(state): State<AppState>) -> Response {
 
 pub async fn update_delegation(State(state): State<AppState>, Form(form): Form<DelegationForm>) -> Response {
     let mut state = state.lock().await;
-    state.delegation.crisis = form.crisis.as_deref() == Some("on");
-    state.delegation.financial = form.financial.as_deref() == Some("on");
-    state.delegation.marketing = form.marketing.as_deref() == Some("on");
-    state.delegation.hr = form.hr.as_deref() == Some("on");
-    state.delegation.supply_chain = form.supply_chain.as_deref() == Some("on");
-    state.delegation.competition = form.competition.as_deref() == Some("on");
-    state.delegation.technology = form.technology.as_deref() == Some("on");
-    state.delegation.regulation = form.regulation.as_deref() == Some("on");
+    let pairs: Vec<(EventCategory, Option<&String>)> = vec![
+        (EventCategory::Crisis, form.crisis.as_ref()),
+        (EventCategory::Financial, form.financial.as_ref()),
+        (EventCategory::Marketing, form.marketing.as_ref()),
+        (EventCategory::HR, form.hr.as_ref()),
+        (EventCategory::SupplyChain, form.supply_chain.as_ref()),
+        (EventCategory::Competition, form.competition.as_ref()),
+        (EventCategory::Technology, form.technology.as_ref()),
+        (EventCategory::Regulation, form.regulation.as_ref()),
+    ];
+    for (cat, val) in pairs {
+        state.delegation.set(cat, val.is_some());
+    }
     state.messages.push("Delegation settings updated.".into());
     Redirect::to("/delegation").into_response()
 }
@@ -463,8 +477,8 @@ pub async fn invest_product(State(state): State<AppState>, Form(form): Form<supe
         return Redirect::to("/products").into_response();
     }
     let increase = invest_in_category(&mut state.products, &form.category_id, amount);
-    state.company.cash -= amount;
     if increase > 0.0 {
+        state.company.cash -= amount;
         state.messages.push(format!("Invested {} in product category. Investment increased by {:.1}%.", format_currency(amount), increase));
     } else {
         state.messages.push("Category not found.".into());

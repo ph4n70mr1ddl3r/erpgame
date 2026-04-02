@@ -443,41 +443,25 @@ pub struct PendingEvent {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DelegationSettings {
-    pub crisis: bool,
-    pub financial: bool,
-    pub marketing: bool,
-    pub hr: bool,
-    pub supply_chain: bool,
-    pub competition: bool,
-    pub technology: bool,
-    pub regulation: bool,
+    pub delegated: HashMap<EventCategory, bool>,
 }
 
 impl DelegationSettings {
     pub fn all_false() -> Self {
         DelegationSettings {
-            crisis: false,
-            financial: false,
-            marketing: false,
-            hr: false,
-            supply_chain: false,
-            competition: false,
-            technology: false,
-            regulation: false,
+            delegated: EventCategory::all_categories()
+                .into_iter()
+                .map(|c| (c, false))
+                .collect(),
         }
     }
 
     pub fn is_delegated(&self, category: EventCategory) -> bool {
-        match category {
-            EventCategory::Crisis => self.crisis,
-            EventCategory::Financial => self.financial,
-            EventCategory::Marketing => self.marketing,
-            EventCategory::HR => self.hr,
-            EventCategory::SupplyChain => self.supply_chain,
-            EventCategory::Competition => self.competition,
-            EventCategory::Technology => self.technology,
-            EventCategory::Regulation => self.regulation,
-        }
+        self.delegated.get(&category).copied().unwrap_or(false)
+    }
+
+    pub fn set(&mut self, category: EventCategory, value: bool) {
+        self.delegated.insert(category, value);
     }
 }
 

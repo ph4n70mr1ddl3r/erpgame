@@ -397,9 +397,15 @@ fn calculate_revenue(
 }
 
 fn store_has_competitor_nearby(store: &Store) -> bool {
-    get_available_cities()
-        .iter()
-        .any(|c| c.name == store.city && c.has_competitor)
+    static COMPETITOR_CITIES: std::sync::LazyLock<std::collections::HashSet<&'static str>> =
+        std::sync::LazyLock::new(|| {
+            get_available_cities()
+                .iter()
+                .filter(|c| c.has_competitor)
+                .map(|c| c.name.as_str())
+                .collect()
+        });
+    COMPETITOR_CITIES.contains(store.city.as_str())
 }
 
 fn calculate_expenses(state: &mut GameState, operating_count: u32, cto_skill: Option<f64>) -> f64 {
@@ -420,6 +426,12 @@ fn calculate_expenses(state: &mut GameState, operating_count: u32, cto_skill: Op
     let product_cost_factor = 1.0 + (1.0 - total_product_margin_modifier(&state.products)) * 0.3;
     let mut total_expenses = 0.0;
     let cities = get_available_cities();
+    let non_closed_count = state
+        .stores
+        .iter()
+        .filter(|s| s.status != StoreStatus::Closed)
+        .count()
+        .max(1) as f64;
     for store in &mut state.stores {
         if store.status == StoreStatus::Closed {
             store.quarterly_expenses = 0.0;
@@ -476,7 +488,7 @@ fn calculate_expenses(state: &mut GameState, operating_count: u32, cto_skill: Op
             + utilities
             + inventory_cost
             + maintenance
-            + marketing_total / operating_count.max(1) as f64
+            + marketing_total / non_closed_count
             + service_cost
             + hr_cost
             + construction_cost;

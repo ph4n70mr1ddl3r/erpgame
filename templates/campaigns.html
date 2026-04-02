@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1 style="font-size: 1.5rem; font-weight: 700; margin-bottom: 0.25rem;">Marketing Campaigns</h1>
+<p style="color: #64748b; margin-bottom: 1rem;">Launch time-limited marketing campaigns to boost revenue, brand reputation, and customer satisfaction. Your CMO's skill amplifies campaign effects.</p>
+
+{% if messages.len() > 0 %}
+<div style="margin-bottom: 1rem;">
+    {% for msg in messages %}
+    <div class="message msg-info">{{ msg }}</div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+    <div class="stat-card">
+        <div style="font-size: 0.75rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em;">Active Campaigns</div>
+        <div style="font-size: 1.5rem; font-weight: 700; margin-top: 0.25rem;">{{ active_count }} / 5</div>
+    </div>
+    <div class="stat-card">
+        <div style="font-size: 0.75rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em;">Revenue Boost</div>
+        <div style="font-size: 1.5rem; font-weight: 700; margin-top: 0.25rem; color: #22c55e;">{{ effective_revenue_bonus }}</div>
+    </div>
+    <div class="stat-card">
+        <div style="font-size: 0.75rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em;">CMO Skill</div>
+        <div style="font-size: 1.5rem; font-weight: 700; margin-top: 0.25rem;">{{ cmo_skill }}</div>
+        <div style="font-size: 0.7rem; color: #64748b; margin-top: 0.15rem;">Amplifies campaign effects</div>
+    </div>
+</div>
+
+{% if active_campaigns.len() > 0 %}
+<h2 style="font-size: 1.1rem; font-weight: 600; margin-bottom: 0.75rem;">Active Campaigns</h2>
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+    {% for campaign in active_campaigns %}
+    <div class="card" style="padding: 1rem; border-left: 4px solid #f59e0b;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+            <h3 style="font-size: 1rem; font-weight: 600; color: #f59e0b;">{{ campaign.name }}</h3>
+            <span style="font-size: 0.7rem; background: #f59e0b; color: #0f172a; padding: 0.15rem 0.5rem; border-radius: 0.25rem; font-weight: 600;">ACTIVE</span>
+        </div>
+        <p style="font-size: 0.8rem; color: #94a3b8; margin-bottom: 0.75rem;">{{ campaign.description }}</p>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; font-size: 0.8rem;">
+            <div>
+                <span style="color: #64748b;">Revenue:</span>
+                <span style="color: #22c55e;">{{ campaign.revenue_boost }}</span>
+            </div>
+            <div>
+                <span style="color: #64748b;">Reputation:</span>
+                <span style="color: #3b82f6;">{{ campaign.reputation_boost }}</span>
+            </div>
+            <div>
+                <span style="color: #64748b;">Satisfaction:</span>
+                <span style="color: #a78bfa;">{{ campaign.satisfaction_boost }}</span>
+            </div>
+            <div>
+                <span style="color: #64748b;">Started:</span>
+                <span style="color: #e2e8f0;">{{ campaign.started }}</span>
+            </div>
+        </div>
+        <div style="margin-top: 0.75rem;">
+            <div style="font-size: 0.75rem; color: #64748b; margin-bottom: 0.25rem;">Time Remaining: {{ campaign.quarters_remaining }} / {{ campaign.quarters_total }} quarter(s)</div>
+            <div class="progress-bar">
+                <div class="progress-fill" style="width: {% if campaign.quarters_total > 0 %}{{ (campaign.quarters_remaining * 100 / campaign.quarters_total) }}{% else %}0{% endif %}%; background: #f59e0b;"></div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<h2 style="font-size: 1.1rem; font-weight: 600; margin-bottom: 0.75rem;">Launch a Campaign</h2>
+
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1rem;">
+    {% for opt in options %}
+    <div class="card" style="padding: 1rem;">
+        <h3 style="font-size: 1rem; font-weight: 600; margin-bottom: 0.5rem; color: #3b82f6;">{{ opt.name }}</h3>
+        <p style="font-size: 0.8rem; color: #94a3b8; margin-bottom: 0.75rem;">{{ opt.description }}</p>
+        <div style="font-size: 0.8rem; color: #64748b; margin-bottom: 0.5rem;">
+            <div>Cost: <span style="color: #e2e8f0;">{{ opt.cost }}</span></div>
+            <div>Duration: <span style="color: #e2e8f0;">{{ opt.duration }} quarter(s)</span></div>
+            <div>Revenue Boost: <span style="color: #22c55e;">{{ opt.revenue_boost }}</span></div>
+            <div>Reputation: <span style="color: #3b82f6;">{{ opt.reputation_boost }}</span></div>
+            <div>Satisfaction: <span style="color: #a78bfa;">{{ opt.satisfaction_boost }}</span></div>
+        </div>
+        {% if opt.can_launch %}
+        <form action="/campaigns/launch" method="POST" style="margin-top: 0.5rem;">
+            <input type="hidden" name="campaign_type" value="{{ opt.key }}">
+            <button type="submit" class="btn-primary btn-sm" style="width: 100%;">Launch Campaign</button>
+        </form>
+        {% else if opt.show_reason %}
+        <div style="font-size: 0.75rem; color: #ef4444; margin-top: 0.5rem; text-align: center;">{{ opt.reason }}</div>
+        {% endif %}
+    </div>
+    {% endfor %}
+</div>
+
+<div style="margin-top: 1.5rem; text-align: center; font-size: 0.8rem; color: #64748b;">
+    Cash on hand: <span style="color: #e2e8f0;">{{ cash }}</span>
+</div>
+
+{% endblock %}

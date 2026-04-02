@@ -284,3 +284,38 @@ pub struct LoyaltyTierRow {
 pub struct LoyaltyTierForm {
     pub tier: String,
 }
+
+#[derive(Debug, Deserialize)]
+pub struct CampaignForm {
+    pub campaign_type: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct CampaignRow {
+    pub id: String,
+    pub name: String,
+    pub icon: String,
+    pub description: String,
+    pub quarters_remaining: i32,
+    pub quarters_total: i32,
+    pub revenue_boost: String,
+    pub reputation_boost: String,
+    pub satisfaction_boost: String,
+    pub started: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct CampaignOption {
+    pub key: String,
+    pub name: String,
+    pub icon: String,
+    pub description: String,
+    pub cost: String,
+    pub duration: i32,
+    pub revenue_boost: String,
+    pub reputation_boost: String,
+    pub satisfaction_boost: String,
+    pub can_launch: bool,
+    pub reason: String,
+    pub show_reason: bool,
+}

@@ -204,3 +204,17 @@ pub struct AchievementsTemplate {
     pub current_quarter: String,
     pub active_page: String,
 }
+
+#[derive(Template)]
+#[template(path = "campaigns.html")]
+pub struct CampaignsTemplate {
+    pub active_campaigns: Vec<crate::api::dto::CampaignRow>,
+    pub options: Vec<crate::api::dto::CampaignOption>,
+    pub effective_revenue_bonus: String,
+    pub cmo_skill: String,
+    pub active_count: usize,
+    pub cash: String,
+    pub messages: Vec<String>,
+    pub current_quarter: String,
+    pub active_page: String,
+}

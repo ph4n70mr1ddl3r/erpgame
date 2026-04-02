@@ -1,5 +1,6 @@
 pub mod achievements;
 pub mod board;
+pub mod campaigns;
 pub mod competitors;
 pub mod economy;
 pub mod events;

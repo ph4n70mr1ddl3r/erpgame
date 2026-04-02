@@ -41,6 +41,8 @@ pub struct GameState {
     pub competitors: Vec<super::competitors::Competitor>,
     pub achievements: Vec<super::achievements::Achievement>,
     pub loyalty: super::loyalty::LoyaltyProgram,
+    #[serde(default)]
+    pub campaigns: Vec<super::campaigns::Campaign>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -948,6 +950,7 @@ impl GameState {
             competitors: default_competitors(),
             achievements: default_achievements(),
             loyalty: super::loyalty::LoyaltyProgram::new(),
+            campaigns: vec![],
         }
     }
 

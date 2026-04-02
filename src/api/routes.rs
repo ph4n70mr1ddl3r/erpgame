@@ -13,6 +13,7 @@ use crate::game::{
     Region, Store, StoreStatus, StoreType, UpgradeType, format_currency, format_currency_full,
     generate_executive_name, get_available_cities, pct, simulate_quarter,
     achievements::unlocked_count, competitors::total_competitor_market_share,
+    campaigns::{CampaignType, campaign_revenue_multiplier, launch_campaign},
     loyalty::{LoyaltyTier, loyalty_revenue_multiplier},
     products::invest_in_category, upgrades::purchase_upgrade as do_purchase_upgrade,
 };
@@ -786,4 +787,98 @@ pub async fn update_loyalty(State(state): State<AppState>, Form(form): Form<supe
     }
 
     Redirect::to("/loyalty").into_response()
+}
+
+pub async fn campaigns_page(State(state): State<AppState>) -> Response {
+    let state = state.lock().await;
+    let s = &*state;
+
+    let active_rows: Vec<crate::api::dto::CampaignRow> = s.campaigns.iter().map(|c| {
+        let ct = c.campaign_type;
+        crate::api::dto::CampaignRow {
+            id: c.id.clone(),
+            name: ct.label().to_string(),
+            icon: ct.icon().to_string(),
+            description: ct.description().to_string(),
+            quarters_remaining: c.quarters_remaining,
+            quarters_total: c.quarters_total,
+            revenue_boost: format!("+{:.0}%", ct.revenue_boost() * 100.0),
+            reputation_boost: if ct.reputation_boost() > 0.0 { format!("+{:.1}", ct.reputation_boost()) } else { "-".into() },
+            satisfaction_boost: if ct.satisfaction_boost() > 0.0 { format!("+{:.1}", ct.satisfaction_boost()) } else { "-".into() },
+            started: format!("Q{} {}", c.start_quarter, c.start_year),
+        }
+    }).collect();
+
+    let active_type_keys: std::collections::HashSet<String> = s.campaigns.iter().map(|c| c.campaign_type.key().to_string()).collect();
+    let can_launch_more = s.campaigns.len() < 5;
+
+    let options: Vec<crate::api::dto::CampaignOption> = CampaignType::all_types().iter().map(|ct| {
+        let already_active = active_type_keys.contains(ct.key());
+        let can_afford = s.company.cash >= ct.base_cost();
+        let (can_launch, reason, show_reason) = if already_active {
+            (false, "Already active".into(), true)
+        } else if !can_launch_more {
+            (false, "Max 5 concurrent campaigns".into(), true)
+        } else if !can_afford {
+            (false, format!("Need {}", format_currency(ct.base_cost())), true)
+        } else {
+            (true, String::new(), false)
+        };
+        crate::api::dto::CampaignOption {
+            key: ct.key().to_string(),
+            name: ct.label().to_string(),
+            icon: ct.icon().to_string(),
+            description: ct.description().to_string(),
+            cost: format_currency(ct.base_cost()),
+            duration: ct.duration_quarters(),
+            revenue_boost: format!("+{:.0}%", ct.revenue_boost() * 100.0),
+            reputation_boost: if ct.reputation_boost() > 0.0 { format!("+{:.1}", ct.reputation_boost()) } else { "-".into() },
+            satisfaction_boost: if ct.satisfaction_boost() > 0.0 { format!("+{:.1}", ct.satisfaction_boost()) } else { "-".into() },
+            can_launch,
+            reason,
+            show_reason,
+        }
+    }).collect();
+
+    let effective_mult = campaign_revenue_multiplier(s);
+    let effective_pct = format!("{:.1}%", (effective_mult - 1.0) * 100.0);
+
+    let cmo_skill = s.executives.iter().find(|e| e.position == ExecutivePosition::CMO).map(|e| format!("{:.0}/100", e.skill)).unwrap_or_else(|| "Not hired".into());
+
+    crate::templates::CampaignsTemplate {
+        active_campaigns: active_rows,
+        options,
+        effective_revenue_bonus: effective_pct,
+        cmo_skill,
+        active_count: s.campaigns.len(),
+        cash: format_currency_full(s.company.cash),
+        messages: s.messages.clone(),
+        current_quarter: s.advance_quarter_label(),
+        active_page: "campaigns".to_string(),
+    }.into_response()
+}
+
+pub async fn launch_campaign_route(State(state): State<AppState>, Form(form): Form<super::dto::CampaignForm>) -> Response {
+    let mut state = state.lock().await;
+    let campaign_type = match CampaignType::from_key(&form.campaign_type) {
+        Some(ct) => ct,
+        None => {
+            state.messages.push("Invalid campaign type.".into());
+            return Redirect::to("/campaigns").into_response();
+        }
+    };
+    match launch_campaign(&mut state, campaign_type) {
+        Ok(cost) => {
+            state.messages.push(format!(
+                "Launched '{}' campaign for {}. It will run for {} quarter(s).",
+                campaign_type.label(),
+                format_currency(cost),
+                campaign_type.duration_quarters()
+            ));
+        }
+        Err(msg) => {
+            state.messages.push(msg.to_string());
+        }
+    }
+    Redirect::to("/campaigns").into_response()
 }

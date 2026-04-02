@@ -2,6 +2,7 @@ use rand::Rng;
 
 use super::achievements::check_achievements;
 use super::board::update_board;
+use super::campaigns::{campaign_revenue_multiplier, process_campaigns};
 use super::competitors::{
     average_competitor_strength, update_competitors_with_actions, PlayerActions,
 };
@@ -73,6 +74,7 @@ pub fn simulate_quarter(state: &mut GameState) {
     let total_revenue = calculate_revenue(state, &mut rng, cfo_skill, coo_skill, cmo_skill);
     let total_expenses = calculate_expenses(state, operating_count, cto_skill);
     let loyalty_cost = update_loyalty(state);
+    let _campaign_rev_mult = process_campaigns(state);
     let loan_payments = process_loans(state);
     let event_impacts = process_random_events(state, &mut rng, total_revenue);
 
@@ -389,6 +391,8 @@ fn calculate_revenue(
 
     let loyalty_rev_mult = loyalty_revenue_multiplier(state);
 
+    let campaign_mult = campaign_revenue_multiplier(state);
+
     let skill_mult = 0.85 + (state.employees.avg_skill / 100.0) * 0.3;
 
     let mut city_counts: std::collections::HashMap<String, usize> =
@@ -463,6 +467,7 @@ fn calculate_revenue(
             * upgrade_rev_mult
             * expansion_mult
             * loyalty_rev_mult
+            * campaign_mult
             * skill_mult
             * noise;
 

@@ -2,9 +2,7 @@ use rand::Rng;
 
 use super::achievements::check_achievements;
 use super::board::update_board;
-use super::competitors::{
-    average_competitor_strength, total_competitor_market_share, update_competitors,
-};
+use super::competitors::{average_competitor_strength, update_competitors};
 use super::events::{generate_auto_events, generate_pending_events};
 use super::products::{
     total_product_margin_modifier, total_product_revenue_modifier, update_product_categories,
@@ -122,11 +120,13 @@ pub fn simulate_quarter(state: &mut GameState) {
         expenses: total_expenses,
         profit: final_profit,
         tax_paid: tax,
-        cash_flow: final_profit - loan_payments,
+        cash_flow: final_profit,
         store_count: state.operating_store_count(),
         employee_count: state.employees.total_count,
         market_share: state.company.market_share,
         customer_satisfaction: state.company.customer_satisfaction,
+        employee_satisfaction: state.company.employee_satisfaction,
+        brand_reputation: state.company.brand_reputation,
     };
     state.financial_history.push(report);
 
@@ -342,8 +342,6 @@ fn calculate_revenue(
     let cmo_bonus = 1.0 + cmo_skill.unwrap_or(0.0) * 0.003;
 
     let product_rev_mult = total_product_revenue_modifier(&state.products);
-    let _product_margin_mult = total_product_margin_modifier(&state.products);
-    let _competitor_market_share = total_competitor_market_share(&state.competitors);
 
     let mut total_revenue = 0.0;
 
@@ -418,18 +416,15 @@ fn calculate_expenses(state: &mut GameState, operating_count: u32, cto_skill: Op
             MarketingPolicy::Heavy => 600_000.0,
             MarketingPolicy::Aggressive => 1_000_000.0,
         };
-
     let cto_cost_reduction = 1.0 - cto_skill.unwrap_or(0.0) * 0.001;
     let product_cost_factor = 1.0 + (1.0 - total_product_margin_modifier(&state.products)) * 0.3;
     let mut total_expenses = 0.0;
-
+    let cities = get_available_cities();
     for store in &mut state.stores {
         if store.status == StoreStatus::Closed {
             store.quarterly_expenses = 0.0;
             continue;
         }
-
-        let cities = get_available_cities();
         let rent_rate = cities
             .iter()
             .find(|c| c.name == store.city)
@@ -437,14 +432,12 @@ fn calculate_expenses(state: &mut GameState, operating_count: u32, cto_skill: Op
             .unwrap_or(500.0);
         let monthly_rent = store.size_sqm as f64 * rent_rate;
         let quarterly_rent = monthly_rent * 3.0;
-
         let employee_count = if store.status == StoreStatus::UnderConstruction {
             (store.size_sqm as f64 * 0.005) as u32
         } else {
             (store.size_sqm as f64 * store.store_type.employees_per_sqm()) as u32
         };
         store.employee_count = employee_count;
-
         let quarterly_payroll = employee_count as f64 * avg_salary * 3.0;
         let utilities = store.size_sqm as f64 * 150.0 * 3.0;
         let inventory_cost = if store.status == StoreStatus::Operating {
@@ -477,9 +470,7 @@ fn calculate_expenses(state: &mut GameState, operating_count: u32, cto_skill: Op
         } else {
             0.0
         };
-
         let upgrade_cost_mult = get_store_cost_modifier(&state.upgrades, &store.id);
-
         let mut store_expenses = quarterly_rent
             + quarterly_payroll
             + utilities
@@ -493,7 +484,6 @@ fn calculate_expenses(state: &mut GameState, operating_count: u32, cto_skill: Op
         store.quarterly_expenses = store_expenses;
         total_expenses += store_expenses;
     }
-
     let executive_payroll: f64 = state
         .executives
         .iter()
@@ -558,10 +548,9 @@ fn process_executive_decisions(state: &mut GameState, rng: &mut rand::rngs::Thre
 }
 
 fn update_employees(state: &mut GameState, rng: &mut rand::rngs::ThreadRng) {
-    let mut total_employees: u32 = state.stores.iter().map(|s| s.employee_count).sum();
-    total_employees += state.executives.len() as u32;
-    total_employees += (total_employees as f64 * 0.1) as u32;
-    state.employees.total_count = total_employees;
+    let store_employees: u32 = state.stores.iter().map(|s| s.employee_count).sum();
+    let overhead_staff = (store_employees as f64 * 0.1) as u32;
+    state.employees.total_count = store_employees + overhead_staff + state.executives.len() as u32;
 
     let base_salary = state.economy.minimum_wage_daily * 22.0;
     let salary_multiplier = match state.policies.hr {
@@ -571,7 +560,7 @@ fn update_employees(state: &mut GameState, rng: &mut rand::rngs::ThreadRng) {
         HrPolicy::Elite => 1.8,
     };
     let avg_salary = base_salary * salary_multiplier;
-    state.employees.monthly_payroll = total_employees as f64 * avg_salary;
+    state.employees.monthly_payroll = state.employees.total_count as f64 * avg_salary;
 
     let hr_morale_base = match state.policies.hr {
         HrPolicy::Minimal => 35.0,
@@ -613,7 +602,7 @@ fn update_employees(state: &mut GameState, rng: &mut rand::rngs::ThreadRng) {
     let turnover: f64 = base_turnover + morale_turnover + rng.gen_range(-2.0..2.0);
     state.employees.turnover_rate = turnover.clamp(1.0, 25.0);
 
-    let hiring_costs = turnover / 100.0 * total_employees as f64 * avg_salary * 2.0;
+    let hiring_costs = turnover / 100.0 * state.employees.total_count as f64 * avg_salary * 2.0;
     state.company.cash -= hiring_costs;
 }
 

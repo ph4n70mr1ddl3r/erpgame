@@ -284,6 +284,8 @@ pub struct QuarterlyReport {
     pub employee_count: u32,
     pub market_share: f64,
     pub customer_satisfaction: f64,
+    pub employee_satisfaction: f64,
+    pub brand_reputation: f64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -942,7 +944,9 @@ impl GameState {
             current_quarter: 1,
             current_year: 2025,
             game_over: false,
-            messages: vec!["Welcome to Bahay Depot! You are the new CEO. Your first store is open in Quezon City. Set your policies, hire your executive team, and grow the company!".into()],
+            messages: vec![
+                "Welcome to Bahay Depot! You are the new CEO. Your first store is open in Quezon City. Set your policies, hire your executive team, and grow the company!".into(),
+            ],
             pending_events: vec![],
             delegation: DelegationSettings::all_false(),
             decisions_made: 0,
@@ -1039,5 +1043,11 @@ pub fn category_to_event_type(cat: EventCategory) -> EventType {
         EventCategory::Competition => EventType::Competition,
         EventCategory::Technology => EventType::Positive,
         EventCategory::Regulation => EventType::Regulation,
+    }
+}
+
+impl Default for GameState {
+    fn default() -> Self {
+        Self::new()
     }
 }

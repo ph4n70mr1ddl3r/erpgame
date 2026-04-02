@@ -259,11 +259,7 @@ pub fn check_achievements(state: &mut GameState, last_revenue: f64) {
         consecutive_profit && state.financial_history.len() >= 5,
     );
 
-    let all_max_invest = if let Some(products) = Some(&state.products) {
-        products.iter().all(|p| p.investment_level >= 99.0)
-    } else {
-        false
-    };
+    let all_max_invest = state.products.iter().all(|p| p.investment_level >= 99.0);
     check_one(state, "product_pioneer", &q_label, all_max_invest);
     check_one(
         state,

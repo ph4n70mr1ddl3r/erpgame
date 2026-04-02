@@ -69,7 +69,7 @@ pub async fn dashboard(State(state): State<AppState>) -> Response {
         seasonal_multiplier: format!("{:.2}x", s.market.seasonal_multiplier),
         board_patience: format!("{:.0}%", s.board.patience),
         board_patience_class: s.board.patience_class().to_string(),
-        board_patience_color: if s.board.patience > 50.0 { "#22c55e".to_string() } else if s.board.patience > 30.0 { "#f59e0b".to_string() } else { "#ef4444".to_string() },
+        board_patience_color: patience_color(s.board.patience),
         active_page: "dashboard".to_string(),
         chart_json,
         achievements_unlocked: unlocked_count(&s.achievements),
@@ -145,6 +145,8 @@ pub async fn close_store(State(state): State<AppState>, Path(id): Path<String>) 
         state.stores[idx].status = StoreStatus::Closed;
         state.company.cash += sell_value;
         state.messages.push(format!("Closed {} in {}. Received {} from asset sale.", store_name, store_city, format_currency(sell_value)));
+    } else {
+        state.messages.push("Store not found.".into());
     }
     Redirect::to("/stores").into_response()
 }
@@ -264,7 +266,10 @@ pub async fn take_loan(State(state): State<AppState>, Form(form): Form<LoanForm>
     let mut state = state.lock().await;
     let amount: f64 = form.amount.parse().unwrap_or(0.0);
     let quarters: i32 = form.quarters.parse().unwrap_or(8);
-    if amount <= 0.0 || quarters <= 0 { state.messages.push("Invalid loan parameters.".into()); return Redirect::to("/finances").into_response(); }
+    if !amount.is_finite() || !quarters.is_positive() {
+        state.messages.push("Invalid loan parameters.".into());
+        return Redirect::to("/finances").into_response();
+    }
     let max_loan = (state.company.company_value * 0.5).max(crate::game::state::MINIMUM_LOAN_AMOUNT);
     if amount > max_loan { state.messages.push(format!("Loan amount {} exceeds maximum of {}.", format_currency(amount), format_currency(max_loan))); return Redirect::to("/finances").into_response(); }
     let rate = state.economy.interest_rate + 1.5;
@@ -385,6 +390,14 @@ fn rating_class(value: f64, mid: f64) -> String {
     if value >= mid + 10.0 { "text-green-400".to_string() } else if value >= mid { "text-yellow-400".to_string() } else { "text-red-400".to_string() }
 }
 
+fn patience_color(value: f64) -> String {
+    if value > 50.0 { "#22c55e".to_string() } else if value > 30.0 { "#f59e0b".to_string() } else { "#ef4444".to_string() }
+}
+
+fn pressure_color(value: f64) -> String {
+    if value < 30.0 { "#22c55e".to_string() } else if value < 60.0 { "#f59e0b".to_string() } else { "#ef4444".to_string() }
+}
+
 fn build_chart_data(s: &GameState) -> crate::api::dto::ChartData {
     let history = &s.financial_history;
     let labels: Vec<String> = history.iter().map(|r| format!("Q{} {}", r.quarter, r.year)).collect();
@@ -393,17 +406,17 @@ fn build_chart_data(s: &GameState) -> crate::api::dto::ChartData {
     let profit: Vec<f64> = history.iter().map(|r| r.profit / 1_000_000.0).collect();
 
     let mut cash = Vec::new();
-    let mut running_cash = s.company.cash - history.iter().map(|r| r.revenue - r.expenses).sum::<f64>();
+    let mut running_cash = s.company.cash
+        - history.iter().map(|r| r.cash_flow).sum::<f64>();
     for r in history {
-        running_cash += r.revenue - r.expenses;
+        running_cash += r.cash_flow;
         cash.push(running_cash / 1_000_000.0);
     }
-    cash.reverse();
 
     let market_share: Vec<f64> = history.iter().map(|r| r.market_share).collect();
     let customer_sat: Vec<f64> = history.iter().map(|r| r.customer_satisfaction).collect();
-    let employee_sat: Vec<f64> = history.iter().rev().take(history.len()).map(|_| s.company.employee_satisfaction).collect();
-    let brand_rep: Vec<f64> = history.iter().rev().take(history.len()).map(|_| s.company.brand_reputation).collect();
+    let employee_sat: Vec<f64> = history.iter().map(|r| r.employee_satisfaction).collect();
+    let brand_rep: Vec<f64> = history.iter().map(|r| r.brand_reputation).collect();
 
     crate::api::dto::ChartData {
         labels,
@@ -441,7 +454,7 @@ pub async fn products_page(State(state): State<AppState>) -> Response {
 pub async fn invest_product(State(state): State<AppState>, Form(form): Form<super::dto::ProductInvestForm>) -> Response {
     let mut state = state.lock().await;
     let amount: f64 = form.amount.parse().unwrap_or(0.0);
-    if amount < 500_000.0 {
+    if !amount.is_finite() || amount < 500_000.0 {
         state.messages.push("Minimum investment is P500K.".into());
         return Redirect::to("/products").into_response();
     }
@@ -524,9 +537,9 @@ pub async fn board_page(State(state): State<AppState>) -> Response {
     crate::templates::BoardTemplate {
         board: crate::api::dto::BoardInfo {
             patience: format!("{:.0}%", b.patience), patience_class: b.patience_class().to_string(),
-            patience_color: if b.patience > 50.0 { "#22c55e".to_string() } else if b.patience > 30.0 { "#f59e0b".to_string() } else { "#ef4444".to_string() },
+            patience_color: patience_color(b.patience),
             pressure: format!("{:.0}%", b.pressure_level), pressure_class: b.pressure_class().to_string(),
-            pressure_color: if b.pressure_level < 30.0 { "#22c55e".to_string() } else if b.pressure_level < 60.0 { "#f59e0b".to_string() } else { "#ef4444".to_string() },
+            pressure_color: pressure_color(b.pressure_level),
             warnings: b.warnings, description: b.description(),
             last_review: if b.last_review_year > 0 { format!("Q{} {}", b.last_review_quarter, b.last_review_year) } else { "None yet".into() },
             quarters_until_review: quarters_until,

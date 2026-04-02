@@ -454,12 +454,21 @@ fn rating_class(value: f64, mid: f64) -> String {
     if value >= mid + 10.0 { "text-green-400".to_string() } else if value >= mid { "text-yellow-400".to_string() } else { "text-red-400".to_string() }
 }
 
+fn threshold_color(value: f64, good_threshold: f64, warn_threshold: f64, higher_is_good: bool) -> String {
+    let (good, warn) = if higher_is_good {
+        (value > good_threshold, value > warn_threshold)
+    } else {
+        (value < good_threshold, value < warn_threshold)
+    };
+    if good { "#22c55e".to_string() } else if warn { "#f59e0b".to_string() } else { "#ef4444".to_string() }
+}
+
 fn patience_color(value: f64) -> String {
-    if value > 50.0 { "#22c55e".to_string() } else if value > 30.0 { "#f59e0b".to_string() } else { "#ef4444".to_string() }
+    threshold_color(value, 50.0, 30.0, true)
 }
 
 fn pressure_color(value: f64) -> String {
-    if value < 30.0 { "#22c55e".to_string() } else if value < 60.0 { "#f59e0b".to_string() } else { "#ef4444".to_string() }
+    threshold_color(value, 30.0, 60.0, false)
 }
 
 fn build_chart_data(s: &GameState) -> crate::api::dto::ChartData {

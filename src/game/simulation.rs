@@ -2,7 +2,9 @@ use rand::Rng;
 
 use super::achievements::check_achievements;
 use super::board::update_board;
-use super::competitors::{average_competitor_strength, update_competitors};
+use super::competitors::{
+    average_competitor_strength, update_competitors_with_actions, PlayerActions,
+};
 use super::events::{generate_auto_events, generate_pending_events};
 use super::products::{
     total_product_margin_modifier, total_product_revenue_modifier, update_product_categories,
@@ -40,10 +42,22 @@ pub fn simulate_quarter(state: &mut GameState) {
         state.economy.construction_index,
         quarter,
     );
-    update_competitors(
+
+    let player_actions = PlayerActions {
+        player_market_share: state.company.market_share,
+        player_store_count: state.operating_store_count(),
+        player_pricing: state.policies.pricing,
+        player_marketing: state.policies.marketing,
+        player_expansion: state.policies.expansion,
+        opened_new_store: state
+            .stores
+            .iter()
+            .any(|s| s.status == StoreStatus::UnderConstruction),
+    };
+    update_competitors_with_actions(
         &mut state.competitors,
         &mut rng,
-        state.company.market_share,
+        &player_actions,
         &mut state.messages,
     );
     state.market.competitor_count = state.competitors.iter().map(|c| c.store_count).sum();
@@ -244,16 +258,47 @@ fn find_best_choice(choices: &[EventChoice]) -> usize {
 
 fn update_economy(state: &mut GameState, rng: &mut rand::rngs::ThreadRng) {
     let e = &mut state.economy;
-    e.gdp_growth_rate = (e.gdp_growth_rate + rng.gen_range(-0.8..0.8)).clamp(2.0, 9.0);
-    e.inflation_rate = (e.inflation_rate + rng.gen_range(-0.5..0.5)).clamp(1.0, 8.0);
-    e.interest_rate = (e.interest_rate + rng.gen_range(-0.3..0.3)).clamp(3.0, 8.0);
-    e.construction_index = (e.construction_index + rng.gen_range(-5.0..5.0)).clamp(30.0, 100.0);
-    e.consumer_confidence = (e.consumer_confidence + rng.gen_range(-4.0..4.0)).clamp(20.0, 95.0);
-    e.peso_usd_rate = (e.peso_usd_rate + rng.gen_range(-1.0..1.0)).clamp(45.0, 65.0);
-    e.minimum_wage_daily = (e.minimum_wage_daily + rng.gen_range(-5.0..15.0)).clamp(500.0, 800.0);
+
+    let gdp_shock = rng.gen_range(-0.6..0.6);
+    let inflation_shock = rng.gen_range(-0.4..0.4);
+    let interest_shock = rng.gen_range(-0.25..0.25);
+
+    e.gdp_growth_rate = e.gdp_growth_rate * 0.85 + gdp_shock;
+
+    let inflation_pressure = (e.gdp_growth_rate - 5.0) * 0.15;
+    e.inflation_rate =
+        (e.inflation_rate * 0.85 + inflation_pressure + inflation_shock).clamp(1.0, 10.0);
+
+    let target_rate = 2.0 + e.inflation_rate * 0.7 + (e.gdp_growth_rate - 5.0) * 0.2;
+    e.interest_rate = (e.interest_rate * 0.8 + target_rate * 0.2 + interest_shock).clamp(2.0, 12.0);
+
+    e.gdp_growth_rate = e.gdp_growth_rate.clamp(0.5, 10.0);
+
+    let construction_momentum = (e.gdp_growth_rate - 4.0) * 2.0;
+    e.construction_index =
+        (e.construction_index * 0.9 + construction_momentum + rng.gen_range(-3.0..3.0))
+            .clamp(20.0, 100.0);
+
+    let confidence_from_gdp = (e.gdp_growth_rate - 4.0) * 3.0;
+    let confidence_from_inflation = -(e.inflation_rate - 3.0) * 2.0;
+    e.consumer_confidence = (e.consumer_confidence * 0.85
+        + confidence_from_gdp * 0.1
+        + confidence_from_inflation * 0.1
+        + rng.gen_range(-3.0..3.0))
+    .clamp(15.0, 95.0);
+
+    let peso_pressure = -(e.interest_rate - 5.0) * 0.3 + (e.inflation_rate - 3.0) * 0.5;
+    e.peso_usd_rate =
+        (e.peso_usd_rate * 0.92 + (55.0 + peso_pressure) * 0.08 + rng.gen_range(-0.8..0.8))
+            .clamp(40.0, 70.0);
+
+    e.minimum_wage_daily =
+        (e.minimum_wage_daily + e.inflation_rate * 0.3 + rng.gen_range(-2.0..5.0))
+            .clamp(450.0, 900.0);
 
     if state.current_quarter == 1 {
-        e.minimum_wage_daily += rng.gen_range(10.0..30.0);
+        let wage_increase = rng.gen_range(10.0..30.0);
+        e.minimum_wage_daily += wage_increase;
         state.messages.push(format!(
             "Government raised minimum wage to P{:.0}/day",
             e.minimum_wage_daily
@@ -340,6 +385,19 @@ fn calculate_revenue(
 
     let product_rev_mult = total_product_revenue_modifier(&state.products);
 
+    let skill_mult = 0.85 + (state.employees.avg_skill / 100.0) * 0.3;
+
+    let mut city_counts: std::collections::HashMap<String, usize> =
+        std::collections::HashMap::new();
+    let mut region_counts: std::collections::HashMap<Region, usize> =
+        std::collections::HashMap::new();
+    for store in &state.stores {
+        if store.status == StoreStatus::Operating {
+            *city_counts.entry(store.city.clone()).or_insert(0) += 1;
+            *region_counts.entry(store.region).or_insert(0) += 1;
+        }
+    }
+
     let mut total_revenue = 0.0;
 
     for store in &mut state.stores {
@@ -361,6 +419,21 @@ fn calculate_revenue(
         } else {
             1.0
         };
+
+        let same_city = *city_counts.get(&store.city).unwrap_or(&1) as f64;
+        let cannibalization = if same_city > 1.0 {
+            1.0 / (1.0 + (same_city - 1.0) * 0.25)
+        } else {
+            1.0
+        };
+
+        let same_region = *region_counts.get(&store.region).unwrap_or(&1) as f64;
+        let saturation = if same_region > 3.0 {
+            1.0 / (1.0 + (same_region - 3.0) * 0.08)
+        } else {
+            1.0
+        };
+
         let upgrade_rev_mult = get_store_revenue_modifier(&state.upgrades, &store.id);
         let noise = rng.gen_range(0.95..1.05);
 
@@ -377,12 +450,15 @@ fn calculate_revenue(
             * reputation_mult
             * growth_mult
             * competitor_penalty
+            * cannibalization
+            * saturation
             * cfo_bonus
             * coo_bonus
             * cmo_bonus
             * product_rev_mult
             * upgrade_rev_mult
             * expansion_mult
+            * skill_mult
             * noise;
 
         let store_revenue = store_revenue.max(0.0);
@@ -519,7 +595,8 @@ fn process_loans(state: &mut GameState) -> f64 {
     let mut i = 0;
     while i < state.company.loans.len() {
         let loan = &mut state.company.loans[i];
-        let interest = loan.remaining * loan.interest_rate / 100.0 / 4.0;
+        let quarterly_rate = loan.interest_rate / 100.0 / 4.0;
+        let interest = loan.remaining * quarterly_rate;
         let principal = (loan.quarterly_payment - interest).max(0.0);
         loan.remaining -= principal;
         total_payment += loan.quarterly_payment;
@@ -535,20 +612,17 @@ fn process_loans(state: &mut GameState) -> f64 {
 }
 
 fn process_executive_decisions(state: &mut GameState, rng: &mut rand::rngs::ThreadRng) {
+    let company_profitable = state.company.total_profit > 0.0;
+    let performance_delta = if company_profitable { 1.0 } else { -3.0 };
+    let morale_delta = if company_profitable { 1.5 } else { -2.0 };
+
     for exec in &mut state.executives {
         exec.tenure_quarters += 1;
         exec.performance_rating =
-            (exec.performance_rating + rng.gen_range(-5.0..5.0)).clamp(30.0, 100.0);
-        exec.morale = (exec.morale + rng.gen_range(-3.0..3.0)).clamp(20.0, 100.0);
+            (exec.performance_rating + performance_delta + rng.gen_range(-3.0..3.0))
+                .clamp(30.0, 100.0);
+        exec.morale = (exec.morale + morale_delta + rng.gen_range(-2.0..2.0)).clamp(10.0, 100.0);
         exec.loyalty = (exec.loyalty + rng.gen_range(-2.0..2.0)).clamp(10.0, 100.0);
-
-        if exec.morale < 30.0 && rng.gen_bool(0.1) {
-            state.messages.push(format!(
-                "{} ({}) is considering leaving due to low morale!",
-                exec.name,
-                exec.position.short_title()
-            ));
-        }
 
         if exec.tenure_quarters % 4 == 0 {
             let raise = exec.salary_monthly * rng.gen_range(0.02..0.08);
@@ -559,6 +633,32 @@ fn process_executive_decisions(state: &mut GameState, rng: &mut rand::rngs::Thre
                 format_currency_full(exec.salary_monthly)
             ));
         }
+    }
+
+    let mut resigned: Vec<(String, String)> = vec![];
+    state.executives.retain(|exec| {
+        let should_resign = (exec.morale < 25.0 && exec.loyalty < 30.0 && rng.gen_bool(0.5))
+            || (exec.morale < 35.0 && exec.morale >= 25.0 && rng.gen_bool(0.2));
+        if should_resign {
+            resigned.push((exec.name.clone(), exec.position.short_title().to_string()));
+            false
+        } else if exec.morale < 30.0 {
+            state.messages.push(format!(
+                "{} ({}) is considering leaving due to low morale!",
+                exec.name,
+                exec.position.short_title()
+            ));
+            true
+        } else {
+            true
+        }
+    });
+
+    for (name, pos) in resigned {
+        state.messages.push(format!(
+            "[RESIGNED] {} ({}) has resigned due to low morale! Position is now vacant.",
+            name, pos
+        ));
     }
 
     super::executive_ai::generate_recommendations(state);
@@ -602,8 +702,14 @@ fn update_employees(state: &mut GameState, rng: &mut rand::rngs::ThreadRng) -> f
         (state.employees.avg_morale + rng.gen_range(-3.0..3.0)).clamp(15.0, 98.0);
     state.company.employee_satisfaction = state.employees.avg_morale;
 
+    let training_bonus = state
+        .executives
+        .iter()
+        .find(|e| e.position == ExecutivePosition::CHRO)
+        .map(|e| e.skill * 0.02)
+        .unwrap_or(0.0);
     state.employees.avg_skill =
-        (state.employees.avg_skill + rng.gen_range(-1.0..2.0)).clamp(30.0, 90.0);
+        (state.employees.avg_skill + training_bonus + rng.gen_range(-1.0..2.0)).clamp(30.0, 95.0);
 
     let base_turnover = match state.policies.hr {
         HrPolicy::Minimal => 12.0,

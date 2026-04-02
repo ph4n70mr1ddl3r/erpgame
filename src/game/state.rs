@@ -838,9 +838,9 @@ pub fn format_currency_full(amount: f64) -> String {
         result.push(*c);
     }
     if amount < 0.0 {
-        format!("-P{}", result)
+        format!("-₱{}", result)
     } else {
-        format!("P{}", result)
+        format!("₱{}", result)
     }
 }
 

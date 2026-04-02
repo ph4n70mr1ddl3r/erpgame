@@ -1012,7 +1012,14 @@ impl GameState {
 }
 
 pub fn apply_event_effects(state: &mut GameState, effects: &EventEffects) {
+    let recent_revenue = state
+        .financial_history
+        .last()
+        .map(|r| r.revenue)
+        .unwrap_or(0.0);
     state.company.cash += effects.cash;
+    state.company.cash += effects.revenue_modifier * recent_revenue;
+    state.company.cash -= effects.expense_modifier;
     state.company.brand_reputation =
         (state.company.brand_reputation + effects.reputation).clamp(5.0, 100.0);
     state.company.employee_satisfaction =

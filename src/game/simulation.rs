@@ -320,6 +320,13 @@ fn calculate_revenue(
         MarketingPolicy::Aggressive => 1.3,
     };
 
+    let expansion_mult = match state.policies.expansion {
+        ExpansionPolicy::Conservative => 0.95,
+        ExpansionPolicy::Moderate => 1.0,
+        ExpansionPolicy::Aggressive => 1.05,
+        ExpansionPolicy::Blitz => 1.10,
+    };
+
     let morale_mult = 0.9 + (state.company.employee_satisfaction / 100.0) * 0.3;
     let reputation_mult = 0.8 + (state.company.brand_reputation / 100.0) * 0.4;
 
@@ -371,6 +378,7 @@ fn calculate_revenue(
             * cmo_bonus
             * product_rev_mult
             * upgrade_rev_mult
+            * expansion_mult
             * noise;
 
         let store_revenue = store_revenue.max(0.0);
@@ -488,7 +496,14 @@ fn calculate_expenses(state: &mut GameState, operating_count: u32, cto_skill: Op
         .map(|e| e.salary_monthly * 3.0)
         .sum();
     total_expenses += executive_payroll;
-    total_expenses += 500_000.0 * 3.0;
+
+    let expansion_overhead = match state.policies.expansion {
+        ExpansionPolicy::Conservative => 300_000.0,
+        ExpansionPolicy::Moderate => 500_000.0,
+        ExpansionPolicy::Aggressive => 900_000.0,
+        ExpansionPolicy::Blitz => 1_500_000.0,
+    };
+    total_expenses += expansion_overhead * 3.0;
 
     let total_store_employees: u32 = state.stores.iter().map(|s| s.employee_count).sum();
     total_expenses += (total_store_employees as f64 * 0.1) * 20_000.0 * 3.0;

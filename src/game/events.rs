@@ -291,10 +291,10 @@ fn financial_credit_line(s: &GameState, r: &mut rand::rngs::ThreadRng) -> Option
     if !r.gen_bool(0.08) {
         return None;
     }
-    Some(make_event("Bank Offers Credit Line", "BDO has offered Bahay Depot a credit line. This provides a financial safety net but adds debt risk.", EventCategory::Financial, vec![
-        make_choice("Accept Full Credit Line", "Take the full credit line. Gives flexibility for expansion and emergencies.", "Medium", EventEffects { cash: 15_000_000.0, revenue_modifier: 0.02, expense_modifier: 500_000.0, morale: 1.0, reputation: 0.0, satisfaction: 0.0 }),
-        make_choice("Decline", "Maintain financial independence. No debt but less flexibility.", "Low", no_effects()),
-        make_choice("Negotiate Better Terms", "Push for lower interest rate. May succeed or the offer may be withdrawn.", "Low", EventEffects { cash: 10_000_000.0, revenue_modifier: 0.01, expense_modifier: 200_000.0, morale: 0.0, reputation: 1.0, satisfaction: 0.0 }),
+    Some(make_event("Bank Partnership Offer", "BDO has offered Bahay Depot a preferred banking partnership with favorable terms and a small credit bonus.", EventCategory::Financial, vec![
+        make_choice("Accept Partnership", "Accept the partnership. Receive a small credit bonus and improved financial reputation.", "Medium", EventEffects { cash: 2_000_000.0, revenue_modifier: 0.01, expense_modifier: 300_000.0, morale: 1.0, reputation: 2.0, satisfaction: 0.0 }),
+        make_choice("Decline", "Maintain current banking relationships. No risk but no benefit.", "Low", no_effects()),
+        make_choice("Negotiate Better Terms", "Push for better terms. May succeed or the offer may be withdrawn.", "Low", EventEffects { cash: 1_000_000.0, revenue_modifier: 0.005, expense_modifier: 100_000.0, morale: 0.0, reputation: 1.0, satisfaction: 0.0 }),
     ], s.current_quarter, s.current_year))
 }
 

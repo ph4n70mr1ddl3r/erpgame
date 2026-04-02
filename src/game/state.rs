@@ -822,7 +822,7 @@ pub fn format_currency(amount: f64) -> String {
 }
 
 pub fn format_currency_full(amount: f64) -> String {
-    let abs = amount.abs() as u64;
+    let abs = (amount.abs()).round() as u64;
     let s = abs.to_string();
     let chars: Vec<char> = s.chars().collect();
     let mut result = String::new();

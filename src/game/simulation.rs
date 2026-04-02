@@ -55,28 +55,21 @@ pub fn simulate_quarter(state: &mut GameState) {
     let cmo_skill = find_exec_skill(state, ExecutivePosition::CMO);
     let cto_skill = find_exec_skill(state, ExecutivePosition::CTO);
 
-    let total_revenue = calculate_revenue(
-        state,
-        &mut rng,
-        operating_count,
-        cfo_skill,
-        coo_skill,
-        cmo_skill,
-    );
+    let total_revenue = calculate_revenue(state, &mut rng, cfo_skill, coo_skill, cmo_skill);
     let total_expenses = calculate_expenses(state, operating_count, cto_skill);
     let loan_payments = process_loans(state);
     let event_impacts = process_random_events(state, &mut rng);
 
     process_pending_event_generation(state, &mut rng);
     process_executive_decisions(state, &mut rng);
-    update_employees(state, &mut rng);
+    let hiring_costs = update_employees(state, &mut rng);
     update_company_metrics(state, &mut rng);
 
     let operating_count = state.operating_store_count();
     let board_game_over = update_board(
         &mut state.board,
         total_revenue,
-        total_expenses,
+        total_expenses + hiring_costs,
         state.company.market_share,
         operating_count,
         quarter,
@@ -86,8 +79,8 @@ pub fn simulate_quarter(state: &mut GameState) {
 
     check_achievements(state, total_revenue);
 
-    let gross_profit = total_revenue - total_expenses;
-    let net_profit = gross_profit - loan_payments - event_impacts.cash_impact;
+    let gross_profit = total_revenue - total_expenses - hiring_costs;
+    let net_profit = gross_profit - loan_payments + event_impacts.cash_impact;
     let tax = if net_profit > 0.0 {
         net_profit * state.economy.corporate_tax_rate / 100.0
     } else {
@@ -242,7 +235,8 @@ fn find_best_choice(choices: &[EventChoice]) -> usize {
             + c.effects.morale
             + c.effects.satisfaction
             + c.effects.revenue_modifier * 50.0
-            - c.effects.expense_modifier / 1_000_000.0;
+            - c.effects.expense_modifier / 1_000_000.0
+            + c.effects.cash / 1_000_000.0;
         if score > best_score {
             best_score = score;
             best_idx = i;
@@ -302,7 +296,6 @@ fn process_store_construction(state: &mut GameState) {
 fn calculate_revenue(
     state: &mut GameState,
     rng: &mut rand::rngs::ThreadRng,
-    _operating_count: u32,
     cfo_skill: Option<f64>,
     coo_skill: Option<f64>,
     cmo_skill: Option<f64>,
@@ -515,7 +508,7 @@ fn process_loans(state: &mut GameState) -> f64 {
     while i < state.company.loans.len() {
         let loan = &mut state.company.loans[i];
         let interest = loan.remaining * loan.interest_rate / 100.0 / 4.0;
-        let principal = loan.quarterly_payment - interest;
+        let principal = (loan.quarterly_payment - interest).max(0.0);
         loan.remaining -= principal;
         total_payment += loan.quarterly_payment;
         loan.quarters_remaining -= 1;
@@ -559,7 +552,7 @@ fn process_executive_decisions(state: &mut GameState, rng: &mut rand::rngs::Thre
     super::executive_ai::generate_recommendations(state);
 }
 
-fn update_employees(state: &mut GameState, rng: &mut rand::rngs::ThreadRng) {
+fn update_employees(state: &mut GameState, rng: &mut rand::rngs::ThreadRng) -> f64 {
     let store_employees: u32 = state.stores.iter().map(|s| s.employee_count).sum();
     let overhead_staff = (store_employees as f64 * 0.1) as u32;
     state.employees.total_count = store_employees + overhead_staff + state.executives.len() as u32;
@@ -616,6 +609,7 @@ fn update_employees(state: &mut GameState, rng: &mut rand::rngs::ThreadRng) {
 
     let hiring_costs = turnover / 100.0 * state.employees.total_count as f64 * avg_salary * 2.0;
     state.company.cash -= hiring_costs;
+    hiring_costs
 }
 
 fn update_company_metrics(state: &mut GameState, rng: &mut rand::rngs::ThreadRng) {
@@ -692,7 +686,6 @@ fn process_random_events(state: &mut GameState, rng: &mut rand::rngs::ThreadRng)
         }
         state.messages.push(format!("[EVENT] {}", event.title));
         total_impact.cash_impact += event.impact.cash_impact;
-        state.company.cash += event.impact.cash_impact;
         state.company.brand_reputation =
             (state.company.brand_reputation + event.impact.reputation_impact).clamp(5.0, 100.0);
         state.company.employee_satisfaction =

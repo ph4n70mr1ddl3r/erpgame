@@ -57,6 +57,12 @@ impl BoardState {
     }
 }
 
+impl Default for BoardState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[allow(clippy::too_many_arguments)]
 pub fn update_board(
     board: &mut BoardState,

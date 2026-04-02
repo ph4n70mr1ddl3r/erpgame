@@ -110,7 +110,7 @@ pub fn simulate_quarter(state: &mut GameState) {
         quarter,
         year: state.current_year,
         revenue: total_revenue,
-        expenses: total_expenses,
+        expenses: total_expenses + hiring_costs,
         profit: final_profit,
         tax_paid: tax,
         cash_flow: final_profit,
@@ -151,6 +151,10 @@ pub fn simulate_quarter(state: &mut GameState) {
         state.decisions_made, state.decisions_delegated,
     );
     state.messages.push(summary);
+
+    while state.messages.len() > super::state::MAX_MESSAGES {
+        state.messages.remove(0);
+    }
 }
 
 fn process_pending_event_generation(state: &mut GameState, rng: &mut rand::rngs::ThreadRng) {
@@ -506,7 +510,7 @@ fn calculate_expenses(state: &mut GameState, operating_count: u32, cto_skill: Op
     total_expenses += expansion_overhead * 3.0;
 
     let total_store_employees: u32 = state.stores.iter().map(|s| s.employee_count).sum();
-    total_expenses += (total_store_employees as f64 * 0.1) * 20_000.0 * 3.0;
+    total_expenses += (total_store_employees as f64 * 0.1) * avg_salary * 3.0;
     total_expenses
 }
 

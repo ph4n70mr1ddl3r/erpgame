@@ -14,6 +14,7 @@ pub const BANKRUPTCY_THRESHOLD: f64 = -10_000_000.0;
 pub const WINNING_VALUE: f64 = 10_000_000_000.0;
 pub const MINIMUM_LOAN_AMOUNT: f64 = 10_000_000.0;
 pub const MAX_EVENT_LOG_SIZE: usize = 50;
+pub const MAX_MESSAGES: usize = 100;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GameState {
@@ -812,14 +813,16 @@ pub fn generate_executive_name(rng: &mut rand::rngs::ThreadRng) -> String {
 }
 
 pub fn format_currency(amount: f64) -> String {
-    if amount.abs() >= 1_000_000_000.0 {
-        format!("₱{:.1}B", amount / 1_000_000_000.0)
-    } else if amount.abs() >= 1_000_000.0 {
-        format!("₱{:.1}M", amount / 1_000_000.0)
-    } else if amount.abs() >= 1_000.0 {
-        format!("₱{:.0}K", amount / 1_000.0)
+    let prefix = if amount < 0.0 { "-₱" } else { "₱" };
+    let abs = amount.abs();
+    if abs >= 1_000_000_000.0 {
+        format!("{}{:.1}B", prefix, abs / 1_000_000_000.0)
+    } else if abs >= 1_000_000.0 {
+        format!("{}{:.1}M", prefix, abs / 1_000_000.0)
+    } else if abs >= 1_000.0 {
+        format!("{}{:.0}K", prefix, abs / 1_000.0)
     } else {
-        format!("₱{:.0}", amount)
+        format!("{}{:.0}", prefix, abs)
     }
 }
 

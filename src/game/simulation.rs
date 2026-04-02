@@ -58,7 +58,7 @@ pub fn simulate_quarter(state: &mut GameState) {
     let total_revenue = calculate_revenue(state, &mut rng, cfo_skill, coo_skill, cmo_skill);
     let total_expenses = calculate_expenses(state, operating_count, cto_skill);
     let loan_payments = process_loans(state);
-    let event_impacts = process_random_events(state, &mut rng);
+    let event_impacts = process_random_events(state, &mut rng, total_revenue);
 
     process_pending_event_generation(state, &mut rng);
     process_executive_decisions(state, &mut rng);
@@ -644,8 +644,6 @@ fn update_company_metrics(state: &mut GameState, rng: &mut rand::rngs::ThreadRng
 
     state.market.demand_trend =
         (state.market.demand_trend + rng.gen_range(-0.03..0.03)).clamp(0.8, 1.3);
-    state.market.competitor_count =
-        (state.market.competitor_count as i32 + rng.gen_range(-1..2)).max(3) as u32;
     state.market.competitor_strength =
         (state.market.competitor_strength + rng.gen_range(-3.0..3.0)).clamp(50.0, 100.0);
 
@@ -659,7 +657,11 @@ fn update_company_metrics(state: &mut GameState, rng: &mut rand::rngs::ThreadRng
     }
 }
 
-fn process_random_events(state: &mut GameState, rng: &mut rand::rngs::ThreadRng) -> EventImpact {
+fn process_random_events(
+    state: &mut GameState,
+    rng: &mut rand::rngs::ThreadRng,
+    total_revenue: f64,
+) -> EventImpact {
     let events = generate_auto_events(state, rng);
     let mut total_impact = EventImpact {
         cash_impact: 0.0,
@@ -674,6 +676,8 @@ fn process_random_events(state: &mut GameState, rng: &mut rand::rngs::ThreadRng)
         state.log_event(event.clone());
         state.messages.push(format!("[EVENT] {}", event.title));
         total_impact.cash_impact += event.impact.cash_impact;
+        total_impact.cash_impact += event.impact.revenue_impact * total_revenue;
+        total_impact.cash_impact -= event.impact.expense_impact;
         state.company.brand_reputation =
             (state.company.brand_reputation + event.impact.reputation_impact).clamp(5.0, 100.0);
         state.company.employee_satisfaction =

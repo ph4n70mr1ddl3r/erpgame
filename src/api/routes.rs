@@ -181,8 +181,19 @@ pub async fn executives_page(State(state): State<AppState>) -> Response {
 
 pub async fn hire_executive(State(state): State<AppState>, Form(form): Form<HireExecutiveForm>) -> Response {
     let mut state = state.lock().await;
-    let position = match form.position.as_str() { "cfo" => ExecutivePosition::CFO, "coo" => ExecutivePosition::COO, "cmo" => ExecutivePosition::CMO, "cto" => ExecutivePosition::CTO, "chro" => ExecutivePosition::CHRO, "csco" => ExecutivePosition::CSCO, _ => return Redirect::to("/executives").into_response() };
-    if state.is_executive_hired(position) { state.messages.push(format!("{} position is already filled.", position.short_title())); return Redirect::to("/executives").into_response(); }
+    let position = match form.position.as_str() {
+        "cfo" => ExecutivePosition::CFO,
+        "coo" => ExecutivePosition::COO,
+        "cmo" => ExecutivePosition::CMO,
+        "cto" => ExecutivePosition::CTO,
+        "chro" => ExecutivePosition::CHRO,
+        "csco" => ExecutivePosition::CSCO,
+        _ => return Redirect::to("/executives").into_response(),
+    };
+    if state.is_executive_hired(position) {
+        state.messages.push(format!("{} position is already filled.", position.short_title()));
+        return Redirect::to("/executives").into_response();
+    }
     let mut rng = rand::thread_rng();
     let name = generate_executive_name(&mut rng);
     let skill = rng.gen_range(40.0..95.0);
@@ -191,8 +202,26 @@ pub async fn hire_executive(State(state): State<AppState>, Form(form): Form<Hire
     let hiring_bonus = salary * 3.0;
     if state.company.cash < hiring_bonus { state.messages.push(format!("Cannot afford hiring bonus for {} ({})", position.short_title(), format_currency(hiring_bonus))); return Redirect::to("/executives").into_response(); }
     state.company.cash -= hiring_bonus;
-    let exec = Executive { id: uuid::Uuid::new_v4().to_string(), name, position, skill, salary_monthly: salary, morale: rng.gen_range(60.0..85.0), loyalty: rng.gen_range(50.0..80.0), tenure_quarters: 0, performance_rating: rng.gen_range(50.0..80.0), recommendation: None };
-    state.messages.push(format!("Hired {} as {} (Skill: {:.0}/100, Salary: {}/mo, Hiring Bonus: {})", exec.name, exec.position.short_title(), exec.skill, format_currency_full(exec.salary_monthly), format_currency(hiring_bonus)));
+    let exec = Executive {
+        id: uuid::Uuid::new_v4().to_string(),
+        name,
+        position,
+        skill,
+        salary_monthly: salary,
+        morale: rng.gen_range(60.0..85.0),
+        loyalty: rng.gen_range(50.0..80.0),
+        tenure_quarters: 0,
+        performance_rating: rng.gen_range(50.0..80.0),
+        recommendation: None,
+    };
+    state.messages.push(format!(
+        "Hired {} as {} (Skill: {:.0}/100, Salary: {}/mo, Hiring Bonus: {})",
+        exec.name,
+        exec.position.short_title(),
+        exec.skill,
+        format_currency_full(exec.salary_monthly),
+        format_currency(hiring_bonus)
+    ));
     state.executives.push(exec);
     Redirect::to("/executives").into_response()
 }
@@ -203,7 +232,16 @@ pub async fn fire_executive(State(state): State<AppState>, Path(id): Path<String
         let exec_name = state.executives[idx].name.clone();
         let exec_pos = state.executives[idx].position.short_title().to_string();
         let severance = state.executives[idx].salary_monthly * 6.0;
-        if state.company.cash < severance { let cur = format_currency(state.company.cash); state.messages.push(format!("Cannot afford {} severance for {} ({}).", format_currency(severance), exec_name, cur)); return Redirect::to("/executives").into_response(); }
+        if state.company.cash < severance {
+            let cur = format_currency(state.company.cash);
+            state.messages.push(format!(
+                "Cannot afford {} severance for {} ({}).",
+                format_currency(severance),
+                exec_name,
+                cur
+            ));
+            return Redirect::to("/executives").into_response();
+        }
         state.executives.remove(idx);
         state.company.cash -= severance;
         state.messages.push(format!("Fired {} ({}). Paid {} severance.", exec_name, exec_pos, format_currency(severance)));
@@ -254,7 +292,14 @@ pub async fn finances_page(State(state): State<AppState>) -> Response {
     let state = state.lock().await;
     let s = &*state;
     let financial_history: Vec<FinancialRow> = s.financial_history.iter().rev().take(50).map(report_to_row).collect();
-    let loans: Vec<LoanInfo> = s.company.loans.iter().map(|l| LoanInfo { id: l.id.clone(), amount: format_currency_full(l.amount), remaining: format_currency_full(l.remaining), rate: pct(l.interest_rate), quarterly_payment: format_currency_full(l.quarterly_payment), quarters_left: l.quarters_remaining }).collect();
+    let loans: Vec<LoanInfo> = s.company.loans.iter().map(|l| LoanInfo {
+        id: l.id.clone(),
+        amount: format_currency_full(l.amount),
+        remaining: format_currency_full(l.remaining),
+        rate: pct(l.interest_rate),
+        quarterly_payment: format_currency_full(l.quarterly_payment),
+        quarters_left: l.quarters_remaining,
+    }).collect();
     let total_loan_remaining: f64 = s.company.loans.iter().map(|l| l.remaining).sum();
     let max_loan = (s.company.company_value * 0.5).max(crate::game::state::MINIMUM_LOAN_AMOUNT);
     let suggested_rate = s.economy.interest_rate + 1.5;

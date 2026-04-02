@@ -244,7 +244,12 @@ pub fn check_achievements(state: &mut GameState, last_revenue: f64) {
         &q_label,
         state.company.cash >= 200_000_000.0,
     );
-    check_one(state, "debt_free", &q_label, state.company.loans.is_empty());
+    check_one(
+        state,
+        "debt_free",
+        &q_label,
+        state.company.has_ever_had_loan && state.company.loans.is_empty(),
+    );
 
     let consecutive_profit = state
         .financial_history

@@ -90,7 +90,7 @@ pub fn simulate_quarter(state: &mut GameState) {
 
     state.company.cash += final_profit;
     state.company.total_revenue += total_revenue;
-    state.company.total_expenses += total_expenses;
+    state.company.total_expenses += total_expenses + hiring_costs;
     state.company.total_profit += final_profit;
 
     state.company.company_value = state.company.cash
@@ -197,29 +197,22 @@ fn auto_resolve_event(
     apply_event_effects(state, &choice.effects);
     state.decisions_delegated += 1;
 
-    state.event_log.insert(
-        0,
-        GameEvent {
-            id: event.id.clone(),
-            title: event.title.clone(),
-            description: format!("{}: {}", description_prefix, choice.label),
-            event_type: category_to_event_type(event.category),
-            impact: EventImpact {
-                cash_impact: choice.effects.cash,
-                revenue_impact: choice.effects.revenue_modifier,
-                expense_impact: choice.effects.expense_modifier,
-                morale_impact: choice.effects.morale,
-                reputation_impact: choice.effects.reputation,
-                satisfaction_impact: choice.effects.satisfaction,
-            },
-            quarter: event.quarter,
-            year: event.year,
+    state.log_event(GameEvent {
+        id: event.id.clone(),
+        title: event.title.clone(),
+        description: format!("{}: {}", description_prefix, choice.label),
+        event_type: category_to_event_type(event.category),
+        impact: EventImpact {
+            cash_impact: choice.effects.cash,
+            revenue_impact: choice.effects.revenue_modifier,
+            expense_impact: choice.effects.expense_modifier,
+            morale_impact: choice.effects.morale,
+            reputation_impact: choice.effects.reputation,
+            satisfaction_impact: choice.effects.satisfaction,
         },
-    );
-
-    if state.event_log.len() > super::state::MAX_EVENT_LOG_SIZE {
-        state.event_log.pop();
-    }
+        quarter: event.quarter,
+        year: event.year,
+    });
 
     state.messages.push(format!(
         "{} decision on '{}': {}",
@@ -607,9 +600,7 @@ fn update_employees(state: &mut GameState, rng: &mut rand::rngs::ThreadRng) -> f
     let turnover: f64 = base_turnover + morale_turnover + rng.gen_range(-2.0..2.0);
     state.employees.turnover_rate = turnover.clamp(1.0, 25.0);
 
-    let hiring_costs = turnover / 100.0 * state.employees.total_count as f64 * avg_salary * 2.0;
-    state.company.cash -= hiring_costs;
-    hiring_costs
+    turnover / 100.0 * state.employees.total_count as f64 * avg_salary * 2.0
 }
 
 fn update_company_metrics(state: &mut GameState, rng: &mut rand::rngs::ThreadRng) {
@@ -680,10 +671,7 @@ fn process_random_events(state: &mut GameState, rng: &mut rand::rngs::ThreadRng)
     };
 
     for event in events {
-        state.event_log.insert(0, event.clone());
-        if state.event_log.len() > super::state::MAX_EVENT_LOG_SIZE {
-            state.event_log.pop();
-        }
+        state.log_event(event.clone());
         state.messages.push(format!("[EVENT] {}", event.title));
         total_impact.cash_impact += event.impact.cash_impact;
         state.company.brand_reputation =

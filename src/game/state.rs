@@ -56,6 +56,8 @@ pub struct Company {
     pub founded_quarter: i32,
     pub founded_year: i32,
     pub loans: Vec<Loan>,
+    #[serde(default)]
+    pub has_ever_had_loan: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -881,6 +883,7 @@ impl GameState {
                 founded_quarter: 1,
                 founded_year: 2025,
                 loans: vec![],
+                has_ever_had_loan: false,
             },
             stores: vec![store],
             executives: vec![],
@@ -960,6 +963,13 @@ impl GameState {
         format!("Q{} {}", q, y)
     }
 
+    pub fn log_event(&mut self, event: GameEvent) {
+        self.event_log.insert(0, event);
+        if self.event_log.len() > MAX_EVENT_LOG_SIZE {
+            self.event_log.pop();
+        }
+    }
+
     pub fn has_pending_events(&self) -> bool {
         !self.pending_events.is_empty()
     }
@@ -978,28 +988,22 @@ impl GameState {
         if let Some(choice) = event.choices.iter().find(|c| c.id == choice_id) {
             apply_event_effects(self, &choice.effects);
             self.decisions_made += 1;
-            self.event_log.insert(
-                0,
-                GameEvent {
-                    id: event.id.clone(),
-                    title: event.title.clone(),
-                    description: format!("You chose: {}", choice.label),
-                    event_type: category_to_event_type(event.category),
-                    impact: EventImpact {
-                        cash_impact: choice.effects.cash,
-                        revenue_impact: choice.effects.revenue_modifier,
-                        expense_impact: choice.effects.expense_modifier,
-                        morale_impact: choice.effects.morale,
-                        reputation_impact: choice.effects.reputation,
-                        satisfaction_impact: choice.effects.satisfaction,
-                    },
-                    quarter: event.quarter,
-                    year: event.year,
+            self.log_event(GameEvent {
+                id: event.id.clone(),
+                title: event.title.clone(),
+                description: format!("You chose: {}", choice.label),
+                event_type: category_to_event_type(event.category),
+                impact: EventImpact {
+                    cash_impact: choice.effects.cash,
+                    revenue_impact: choice.effects.revenue_modifier,
+                    expense_impact: choice.effects.expense_modifier,
+                    morale_impact: choice.effects.morale,
+                    reputation_impact: choice.effects.reputation,
+                    satisfaction_impact: choice.effects.satisfaction,
                 },
-            );
-            if self.event_log.len() > MAX_EVENT_LOG_SIZE {
-                self.event_log.pop();
-            }
+                quarter: event.quarter,
+                year: event.year,
+            });
             self.messages
                 .push(format!("[DECISION] {}: {}", event.title, choice.label));
         }

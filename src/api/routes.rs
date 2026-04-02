@@ -279,13 +279,18 @@ pub async fn take_loan(State(state): State<AppState>, Form(form): Form<LoanForm>
         state.messages.push(format!("Invalid loan parameters. Minimum loan is {}.", format_currency(crate::game::state::MINIMUM_LOAN_AMOUNT)));
         return Redirect::to("/finances").into_response();
     }
+    let total_outstanding: f64 = state.company.loans.iter().map(|l| l.remaining).sum();
     let max_loan = (state.company.company_value * 0.5).max(crate::game::state::MINIMUM_LOAN_AMOUNT);
-    if amount > max_loan { state.messages.push(format!("Loan amount {} exceeds maximum of {}.", format_currency(amount), format_currency(max_loan))); return Redirect::to("/finances").into_response(); }
+    if total_outstanding + amount > max_loan {
+        state.messages.push(format!("Total debt ({} + new {}) would exceed maximum of {}.", format_currency(total_outstanding), format_currency(amount), format_currency(max_loan)));
+        return Redirect::to("/finances").into_response();
+    }
     let rate = state.economy.interest_rate + 1.5;
     let total_with_interest = amount * (1.0 + rate / 100.0 * quarters as f64 / 4.0);
     let quarterly_payment = total_with_interest / quarters as f64;
     let loan = Loan { id: uuid::Uuid::new_v4().to_string(), amount, interest_rate: rate, remaining: total_with_interest, quarterly_payment, quarters_remaining: quarters };
     state.company.cash += amount;
+    state.company.has_ever_had_loan = true;
     state.company.loans.push(loan);
     state.messages.push(format!("Took a loan of {} at {} APR over {} quarters. Quarterly payment: {}", format_currency(amount), pct(rate), quarters, format_currency(quarterly_payment)));
     Redirect::to("/finances").into_response()
@@ -526,12 +531,13 @@ pub async fn purchase_upgrade(State(state): State<AppState>, Form(form): Form<su
         Some(ut) => ut,
         None => { state.messages.push("Invalid upgrade type.".into()); return Redirect::to("/upgrades").into_response(); }
     };
+    let cost = upgrade_type.cost_per_level();
+    if state.company.cash < cost {
+        state.messages.push(format!("Cannot afford upgrade (need {}).", format_currency(cost)));
+        return Redirect::to("/upgrades").into_response();
+    }
     match do_purchase_upgrade(&mut state.upgrades, &form.store_id, upgrade_type) {
         Ok(cost) => {
-            if state.company.cash < cost {
-                state.messages.push(format!("Cannot afford upgrade (need {}).", format_currency(cost)));
-                return Redirect::to("/upgrades").into_response();
-            }
             state.company.cash -= cost;
             let store_name = state.stores.iter().find(|s| s.id == form.store_id).map(|s| s.name.clone()).unwrap_or_else(|| "Unknown".into());
             state.messages.push(format!("Upgraded {} at {} for {}.", upgrade_type.label(), store_name, format_currency(cost)));

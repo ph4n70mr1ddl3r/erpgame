@@ -175,6 +175,26 @@ pub struct CompetitorsTemplate {
 }
 
 #[derive(Template)]
+#[template(path = "loyalty.html")]
+pub struct LoyaltyTemplate {
+    pub current_tier: String,
+    pub current_tier_class: String,
+    pub members: String,
+    pub member_penetration: String,
+    pub effective_revenue_bonus: String,
+    pub quarters_active: i32,
+    pub quarterly_cost: String,
+    pub satisfaction_bonus: String,
+    pub points_multiplier: String,
+    pub growth_rate: String,
+    pub tiers: Vec<crate::api::dto::LoyaltyTierRow>,
+    pub cash: String,
+    pub messages: Vec<String>,
+    pub current_quarter: String,
+    pub active_page: String,
+}
+
+#[derive(Template)]
 #[template(path = "achievements.html")]
 pub struct AchievementsTemplate {
     pub rows: Vec<crate::api::dto::AchievementRow>,

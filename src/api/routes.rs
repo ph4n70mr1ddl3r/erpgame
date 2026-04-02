@@ -13,6 +13,7 @@ use crate::game::{
     Region, Store, StoreStatus, StoreType, UpgradeType, format_currency, format_currency_full,
     generate_executive_name, get_available_cities, pct, simulate_quarter,
     achievements::unlocked_count, competitors::total_competitor_market_share,
+    loyalty::{LoyaltyTier, loyalty_revenue_multiplier},
     products::invest_in_category, upgrades::purchase_upgrade as do_purchase_upgrade,
 };
 use super::dto::*;
@@ -661,4 +662,128 @@ pub async fn achievements_page(State(state): State<AppState>) -> Response {
         messages: s.messages.clone(), current_quarter: s.advance_quarter_label(),
         active_page: "achievements".to_string(),
     }.into_response()
+}
+
+pub async fn loyalty_page(State(state): State<AppState>) -> Response {
+    let state = state.lock().await;
+    let s = &*state;
+    let program = &s.loyalty;
+    let current = program.tier;
+    let operating = s.operating_store_count() as f64;
+    let max_members = operating * 15_000.0;
+    let penetration = if max_members > 0.0 {
+        (program.members as f64 / max_members * 100.0).min(100.0)
+    } else {
+        0.0
+    };
+
+    let effective_bonus = loyalty_revenue_multiplier(s);
+    let effective_pct = format!("{:.1}%", (effective_bonus - 1.0) * 100.0);
+
+    let all_tiers = [
+        LoyaltyTier::None,
+        LoyaltyTier::Basic,
+        LoyaltyTier::Silver,
+        LoyaltyTier::Gold,
+        LoyaltyTier::Platinum,
+    ];
+
+    let tiers: Vec<crate::api::dto::LoyaltyTierRow> = all_tiers.iter().map(|t| {
+        let is_current = *t == current;
+        let can_afford = s.company.cash >= t.setup_cost();
+        let (can_select, reason, show_reason) = if is_current {
+            (true, String::new(), false)
+        } else if !can_afford {
+            (false, format!("Need {}", format_currency(t.setup_cost())), true)
+        } else {
+            (true, String::new(), false)
+        };
+        crate::api::dto::LoyaltyTierRow {
+            key: t.key().to_string(),
+            name: t.label().to_string(),
+            icon_char: match t {
+                LoyaltyTier::None => "X".into(),
+                LoyaltyTier::Basic => "Star".into(),
+                LoyaltyTier::Silver => "Award".into(),
+                LoyaltyTier::Gold => "Crown".into(),
+                LoyaltyTier::Platinum => "Gem".into(),
+            },
+            color_class: t.color_class().to_string(),
+            description: t.description().to_string(),
+            setup_cost: if t.setup_cost() > 0.0 { format_currency(t.setup_cost()) } else { "Free".into() },
+            quarterly_cost: if t.quarterly_cost_per_store() > 0.0 {
+                format!("{}/store", format_currency(t.quarterly_cost_per_store()))
+            } else {
+                "Free".into()
+            },
+            revenue_bonus: if t.revenue_bonus() > 0.0 { format!("+{:.0}%", t.revenue_bonus() * 100.0) } else { "-".into() },
+            sat_bonus: if t.satisfaction_bonus() > 0.0 { format!("+{:.1}", t.satisfaction_bonus()) } else { "-".into() },
+            is_current,
+            can_select,
+            show_reason,
+            reason,
+        }
+    }).collect();
+
+    let quarterly_cost_val = current.quarterly_cost_per_store() * operating;
+
+    crate::templates::LoyaltyTemplate {
+        current_tier: current.label().to_string(),
+        current_tier_class: current.color_class().to_string(),
+        members: program.members.to_string(),
+        member_penetration: format!("{:.1}", penetration),
+        effective_revenue_bonus: effective_pct,
+        quarters_active: program.quarters_active,
+        quarterly_cost: if quarterly_cost_val > 0.0 { format_currency(quarterly_cost_val) } else { "-".into() },
+        satisfaction_bonus: if current.satisfaction_bonus() > 0.0 { format!("+{:.1}", current.satisfaction_bonus()) } else { "-".into() },
+        points_multiplier: if current.points_multiplier() > 0.0 { format!("{}x", current.points_multiplier()) } else { "-".into() },
+        growth_rate: if current.member_growth_rate() > 0.0 { format!("{:.0}%/quarter", current.member_growth_rate() * 100.0) } else { "-".into() },
+        tiers,
+        cash: format_currency_full(s.company.cash),
+        messages: s.messages.clone(),
+        current_quarter: s.advance_quarter_label(),
+        active_page: "loyalty".to_string(),
+    }.into_response()
+}
+
+pub async fn update_loyalty(State(state): State<AppState>, Form(form): Form<super::dto::LoyaltyTierForm>) -> Response {
+    let mut state = state.lock().await;
+    let new_tier = match LoyaltyTier::from_key(&form.tier) {
+        Some(t) => t,
+        None => {
+            state.messages.push("Invalid loyalty tier.".into());
+            return Redirect::to("/loyalty").into_response();
+        }
+    };
+
+    if new_tier == state.loyalty.tier {
+        return Redirect::to("/loyalty").into_response();
+    }
+
+    let setup_cost = new_tier.setup_cost();
+    if state.company.cash < setup_cost {
+        state.messages.push(format!(
+            "Cannot afford {} loyalty program setup (need {})",
+            new_tier.label(),
+            format_currency(setup_cost)
+        ));
+        return Redirect::to("/loyalty").into_response();
+    }
+
+    state.company.cash -= setup_cost;
+    state.loyalty.tier = new_tier;
+    state.loyalty.members = 0;
+    state.loyalty.quarters_active = 0;
+
+    if new_tier == LoyaltyTier::None {
+        state.messages.push("Loyalty program discontinued. Members will be notified.".into());
+    } else {
+        state.messages.push(format!(
+            "Launched {} Loyalty Program! Setup cost: {}. Members will start enrolling next quarter.",
+            new_tier.label(),
+            format_currency(setup_cost)
+        ));
+    }
+
+    Redirect::to("/loyalty").into_response()
 }

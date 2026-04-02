@@ -15,6 +15,7 @@ A web-based business simulation game where you take on the role of CEO of Bahay 
 - **Delegation**: Delegate decision‑making to your executives based on their expertise.
 - **Board of Directors**: Keep the board's patience high through strong performance or face warnings and eventual firing.
 - **Competitors**: Compete against other home‑improvement chains (Wilcon Depot, CW Home Depot, AllHome) for market share.
+- **Loyalty Program**: Launch and manage a customer loyalty rewards program with multiple tiers (Basic, Silver, Gold, Platinum) to boost revenue, satisfaction, and repeat business.
 - **Achievements**: Unlock achievements for various milestones (store count, revenue, company value, etc.).
 - **Charts & History**: View financial history and performance charts over time.
 

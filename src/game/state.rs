@@ -40,6 +40,7 @@ pub struct GameState {
     pub board: BoardState,
     pub competitors: Vec<super::competitors::Competitor>,
     pub achievements: Vec<super::achievements::Achievement>,
+    pub loyalty: super::loyalty::LoyaltyProgram,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -946,6 +947,7 @@ impl GameState {
             board: BoardState::new(),
             competitors: default_competitors(),
             achievements: default_achievements(),
+            loyalty: super::loyalty::LoyaltyProgram::new(),
         }
     }
 

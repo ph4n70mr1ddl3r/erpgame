@@ -262,3 +262,25 @@ pub struct ChartData {
     pub employee_sat: Vec<f64>,
     pub brand_rep: Vec<f64>,
 }
+
+#[derive(Debug, Serialize)]
+pub struct LoyaltyTierRow {
+    pub key: String,
+    pub name: String,
+    pub icon_char: String,
+    pub color_class: String,
+    pub description: String,
+    pub setup_cost: String,
+    pub quarterly_cost: String,
+    pub revenue_bonus: String,
+    pub sat_bonus: String,
+    pub is_current: bool,
+    pub can_select: bool,
+    pub show_reason: bool,
+    pub reason: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct LoyaltyTierForm {
+    pub tier: String,
+}

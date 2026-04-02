@@ -6,6 +6,7 @@ use super::competitors::{
     average_competitor_strength, update_competitors_with_actions, PlayerActions,
 };
 use super::events::{generate_auto_events, generate_pending_events};
+use super::loyalty::{loyalty_revenue_multiplier, update_loyalty};
 use super::products::{
     total_product_margin_modifier, total_product_revenue_modifier, update_product_categories,
 };
@@ -71,6 +72,7 @@ pub fn simulate_quarter(state: &mut GameState) {
 
     let total_revenue = calculate_revenue(state, &mut rng, cfo_skill, coo_skill, cmo_skill);
     let total_expenses = calculate_expenses(state, operating_count, cto_skill);
+    let loyalty_cost = update_loyalty(state);
     let loan_payments = process_loans(state);
     let event_impacts = process_random_events(state, &mut rng, total_revenue);
 
@@ -83,7 +85,7 @@ pub fn simulate_quarter(state: &mut GameState) {
     let board_game_over = update_board(
         &mut state.board,
         total_revenue,
-        total_expenses + hiring_costs,
+        total_expenses + hiring_costs + loyalty_cost,
         state.company.market_share,
         operating_count,
         quarter,
@@ -93,7 +95,7 @@ pub fn simulate_quarter(state: &mut GameState) {
 
     check_achievements(state, total_revenue);
 
-    let gross_profit = total_revenue - total_expenses - hiring_costs;
+    let gross_profit = total_revenue - total_expenses - hiring_costs - loyalty_cost;
     let net_profit = gross_profit - loan_payments + event_impacts.cash_impact;
     let tax = if net_profit > 0.0 {
         net_profit * state.economy.corporate_tax_rate / 100.0
@@ -104,7 +106,7 @@ pub fn simulate_quarter(state: &mut GameState) {
 
     state.company.cash += final_profit;
     state.company.total_revenue += total_revenue;
-    state.company.total_expenses += total_expenses + hiring_costs;
+    state.company.total_expenses += total_expenses + hiring_costs + loyalty_cost;
     state.company.total_profit += final_profit;
 
     state.company.company_value = state.company.cash
@@ -385,6 +387,8 @@ fn calculate_revenue(
 
     let product_rev_mult = total_product_revenue_modifier(&state.products);
 
+    let loyalty_rev_mult = loyalty_revenue_multiplier(state);
+
     let skill_mult = 0.85 + (state.employees.avg_skill / 100.0) * 0.3;
 
     let mut city_counts: std::collections::HashMap<String, usize> =
@@ -458,6 +462,7 @@ fn calculate_revenue(
             * product_rev_mult
             * upgrade_rev_mult
             * expansion_mult
+            * loyalty_rev_mult
             * skill_mult
             * noise;
 

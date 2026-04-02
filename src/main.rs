@@ -41,6 +41,8 @@ async fn main() {
         .route("/upgrades/purchase", post(api::routes::purchase_upgrade))
         .route("/board", get(api::routes::board_page))
         .route("/competitors", get(api::routes::competitors_page))
+        .route("/loyalty", get(api::routes::loyalty_page))
+        .route("/loyalty", post(api::routes::update_loyalty))
         .route("/achievements", get(api::routes::achievements_page))
         .with_state(game_state)
         .nest_service("/static", ServeDir::new("static"));

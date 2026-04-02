@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1 style="font-size: 1.5rem; font-weight: 700; margin-bottom: 0.25rem;">Loyalty Program</h1>
+<p style="color: #64748b; margin-bottom: 1rem;">Build customer loyalty with a rewards program. Higher tiers cost more but boost revenue and satisfaction.</p>
+
+{% if messages.len() > 0 %}
+<div style="margin-bottom: 1rem;">
+    {% for msg in messages %}
+    <div class="message msg-info">{{ msg }}</div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+    <div class="stat-card">
+        <div style="font-size: 0.75rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em;">Current Tier</div>
+        <div style="font-size: 1.5rem; font-weight: 700; margin-top: 0.25rem;" class="{{ current_tier_class }}">{{ current_tier }}</div>
+    </div>
+    <div class="stat-card">
+        <div style="font-size: 0.75rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em;">Members</div>
+        <div style="font-size: 1.5rem; font-weight: 700; margin-top: 0.25rem;">{{ members }}</div>
+        <div style="font-size: 0.75rem; color: #64748b; margin-top: 0.25rem;">{{ member_penetration }}% of max capacity</div>
+    </div>
+    <div class="stat-card">
+        <div style="font-size: 0.75rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em;">Revenue Bonus</div>
+        <div style="font-size: 1.5rem; font-weight: 700; margin-top: 0.25rem; color: #22c55e;">{{ effective_revenue_bonus }}</div>
+    </div>
+    <div class="stat-card">
+        <div style="font-size: 0.75rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em;">Quarters Active</div>
+        <div style="font-size: 1.5rem; font-weight: 700; margin-top: 0.25rem;">{{ quarters_active }}</div>
+    </div>
+</div>
+
+{% if current_tier != "No Program" %}
+<div class="card" style="padding: 1rem; margin-bottom: 1.5rem;">
+    <h3 style="font-size: 0.9rem; font-weight: 600; margin-bottom: 0.75rem; color: #f59e0b;">Program Performance</h3>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
+        <div>
+            <div style="font-size: 0.75rem; color: #64748b;">Quarterly Cost</div>
+            <div style="font-size: 1rem; font-weight: 600;">{{ quarterly_cost }}</div>
+        </div>
+        <div>
+            <div style="font-size: 0.75rem; color: #64748b;">Satisfaction Bonus</div>
+            <div style="font-size: 1rem; font-weight: 600; color: #22c55e;">{{ satisfaction_bonus }}</div>
+        </div>
+        <div>
+            <div style="font-size: 0.75rem; color: #64748b;">Points Multiplier</div>
+            <div style="font-size: 1rem; font-weight: 600;">{{ points_multiplier }}</div>
+        </div>
+        <div>
+            <div style="font-size: 0.75rem; color: #64748b;">Member Growth Rate</div>
+            <div style="font-size: 1rem; font-weight: 600;">{{ growth_rate }}</div>
+        </div>
+    </div>
+    <div style="margin-top: 1rem;">
+        <div style="font-size: 0.75rem; color: #64748b; margin-bottom: 0.25rem;">Member Capacity</div>
+        <div class="progress-bar">
+            <div class="progress-fill" style="width: {{ member_penetration }}%; background: #3b82f6;"></div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<h2 style="font-size: 1.1rem; font-weight: 600; margin-bottom: 0.75rem;">Choose Your Program</h2>
+
+<form action="/loyalty" method="POST">
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem;">
+    {% for tier in tiers %}
+    <div class="card" style="padding: 1rem; {% if tier.is_current %}border-color: #f59e0b;{% endif %}">
+        <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
+            <span class="{{ tier.color_class }}" style="font-size: 1.25rem;">{{ tier.icon_char }}</span>
+            <h3 style="font-size: 1rem; font-weight: 600;" class="{{ tier.color_class }}">{{ tier.name }}</h3>
+            {% if tier.is_current %}
+            <span style="font-size: 0.7rem; background: #f59e0b; color: #0f172a; padding: 0.15rem 0.5rem; border-radius: 0.25rem; font-weight: 600;">ACTIVE</span>
+            {% endif %}
+        </div>
+        <p style="font-size: 0.8rem; color: #94a3b8; margin-bottom: 0.75rem;">{{ tier.description }}</p>
+        <div style="font-size: 0.8rem; color: #64748b; margin-bottom: 0.5rem;">
+            <div>Setup Cost: <span style="color: #e2e8f0;">{{ tier.setup_cost }}</span></div>
+            <div>Quarterly Cost/Store: <span style="color: #e2e8f0;">{{ tier.quarterly_cost }}</span></div>
+            <div>Revenue Bonus: <span style="color: #22c55e;">{{ tier.revenue_bonus }}</span></div>
+            <div>Satisfaction Bonus: <span style="color: #22c55e;">{{ tier.sat_bonus }}</span></div>
+        </div>
+        {% if tier.can_select %}
+        <button type="submit" name="tier" value="{{ tier.key }}" class="btn-primary btn-sm" style="width: 100%; margin-top: 0.5rem;">
+            {% if tier.is_current %}Keep Current{% else %}Switch to {{ tier.name }}{% endif %}
+        </button>
+        {% else if tier.show_reason %}
+        <div style="font-size: 0.75rem; color: #ef4444; margin-top: 0.5rem; text-align: center;">{{ tier.reason }}</div>
+        {% endif %}
+    </div>
+    {% endfor %}
+</div>
+</form>
+
+<div style="margin-top: 1.5rem; text-align: center; font-size: 0.8rem; color: #64748b;">
+    Cash on hand: <span style="color: #e2e8f0;">{{ cash }}</span>
+</div>
+
+{% endblock %}

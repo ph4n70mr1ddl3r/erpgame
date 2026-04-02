@@ -173,6 +173,14 @@ pub fn default_achievements() -> Vec<Achievement> {
             unlocked: false,
             unlocked_quarter: None,
         },
+        Achievement {
+            id: "loyalty_king".into(),
+            title: "Loyalty King".into(),
+            description: "Reach 100,000 loyalty program members".into(),
+            icon: "Crown".into(),
+            unlocked: false,
+            unlocked_quarter: None,
+        },
     ]
 }
 
@@ -284,6 +292,12 @@ pub fn check_achievements(state: &mut GameState, last_revenue: f64) {
         "winner",
         &q_label,
         state.company.company_value >= super::state::WINNING_VALUE,
+    );
+    check_one(
+        state,
+        "loyalty_king",
+        &q_label,
+        state.loyalty.members >= 100_000,
     );
 }
 

@@ -3,6 +3,11 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::LazyLock;
 
+use super::achievements::default_achievements;
+use super::board::BoardState;
+use super::competitors::default_competitors;
+use super::products::default_product_categories;
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GameState {
     pub company: Company,
@@ -18,6 +23,15 @@ pub struct GameState {
     pub current_year: i32,
     pub game_over: bool,
     pub messages: Vec<String>,
+    pub pending_events: Vec<PendingEvent>,
+    pub delegation: DelegationSettings,
+    pub decisions_made: u32,
+    pub decisions_delegated: u32,
+    pub products: Vec<super::products::ProductCategory>,
+    pub upgrades: Vec<super::upgrades::StoreUpgrade>,
+    pub board: BoardState,
+    pub competitors: Vec<super::competitors::Competitor>,
+    pub achievements: Vec<super::achievements::Achievement>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -67,7 +81,7 @@ pub struct Store {
     pub opened_year: i32,
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Hash, Eq)]
 pub enum Region {
     MetroManila,
     Luzon,
@@ -105,6 +119,7 @@ pub struct Executive {
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Hash, Eq)]
+#[allow(clippy::upper_case_acronyms)]
 pub enum ExecutivePosition {
     CFO,
     COO,
@@ -306,6 +321,161 @@ pub struct CityData {
     pub demand_factor: f64,
     pub population: u32,
     pub has_competitor: bool,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Hash, Eq)]
+pub enum EventCategory {
+    Crisis,
+    Financial,
+    Marketing,
+    HR,
+    SupplyChain,
+    Competition,
+    Technology,
+    Regulation,
+}
+
+impl EventCategory {
+    pub fn label(&self) -> &str {
+        match self {
+            EventCategory::Crisis => "Crisis",
+            EventCategory::Financial => "Financial",
+            EventCategory::Marketing => "Marketing",
+            EventCategory::HR => "HR",
+            EventCategory::SupplyChain => "Supply Chain",
+            EventCategory::Competition => "Competition",
+            EventCategory::Technology => "Technology",
+            EventCategory::Regulation => "Regulation",
+        }
+    }
+
+    pub fn key(&self) -> &str {
+        match self {
+            EventCategory::Crisis => "crisis",
+            EventCategory::Financial => "financial",
+            EventCategory::Marketing => "marketing",
+            EventCategory::HR => "hr",
+            EventCategory::SupplyChain => "supply_chain",
+            EventCategory::Competition => "competition",
+            EventCategory::Technology => "technology",
+            EventCategory::Regulation => "regulation",
+        }
+    }
+
+    pub fn delegate_position(&self) -> ExecutivePosition {
+        match self {
+            EventCategory::Crisis => ExecutivePosition::COO,
+            EventCategory::Financial => ExecutivePosition::CFO,
+            EventCategory::Marketing => ExecutivePosition::CMO,
+            EventCategory::HR => ExecutivePosition::CHRO,
+            EventCategory::SupplyChain => ExecutivePosition::CSCO,
+            EventCategory::Competition => ExecutivePosition::COO,
+            EventCategory::Technology => ExecutivePosition::CTO,
+            EventCategory::Regulation => ExecutivePosition::CFO,
+        }
+    }
+
+    pub fn all_categories() -> Vec<EventCategory> {
+        vec![
+            EventCategory::Crisis,
+            EventCategory::Financial,
+            EventCategory::Marketing,
+            EventCategory::HR,
+            EventCategory::SupplyChain,
+            EventCategory::Competition,
+            EventCategory::Technology,
+            EventCategory::Regulation,
+        ]
+    }
+
+    pub fn icon(&self) -> &str {
+        match self {
+            EventCategory::Crisis => "Tornado",
+            EventCategory::Financial => "Chart",
+            EventCategory::Marketing => "Megaphone",
+            EventCategory::HR => "Users",
+            EventCategory::SupplyChain => "Ship",
+            EventCategory::Competition => "Building",
+            EventCategory::Technology => "Cpu",
+            EventCategory::Regulation => "Clipboard",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EventEffects {
+    pub cash: f64,
+    pub revenue_modifier: f64,
+    pub expense_modifier: f64,
+    pub morale: f64,
+    pub reputation: f64,
+    pub satisfaction: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EventChoice {
+    pub id: String,
+    pub label: String,
+    pub description: String,
+    pub effects: EventEffects,
+    pub risk_level: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PendingEvent {
+    pub id: String,
+    pub title: String,
+    pub description: String,
+    pub category: EventCategory,
+    pub choices: Vec<EventChoice>,
+    pub quarter: i32,
+    pub year: i32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DelegationSettings {
+    pub crisis: bool,
+    pub financial: bool,
+    pub marketing: bool,
+    pub hr: bool,
+    pub supply_chain: bool,
+    pub competition: bool,
+    pub technology: bool,
+    pub regulation: bool,
+}
+
+impl DelegationSettings {
+    pub fn all_false() -> Self {
+        DelegationSettings {
+            crisis: false,
+            financial: false,
+            marketing: false,
+            hr: false,
+            supply_chain: false,
+            competition: false,
+            technology: false,
+            regulation: false,
+        }
+    }
+
+    pub fn is_delegated(&self, category: EventCategory) -> bool {
+        match category {
+            EventCategory::Crisis => self.crisis,
+            EventCategory::Financial => self.financial,
+            EventCategory::Marketing => self.marketing,
+            EventCategory::HR => self.hr,
+            EventCategory::SupplyChain => self.supply_chain,
+            EventCategory::Competition => self.competition,
+            EventCategory::Technology => self.technology,
+            EventCategory::Regulation => self.regulation,
+        }
+    }
+}
+
+impl Default for DelegationSettings {
+    fn default() -> Self {
+        Self::all_false()
+    }
 }
 
 impl StoreType {
@@ -664,7 +834,7 @@ pub fn format_currency_full(amount: f64) -> String {
     let chars: Vec<char> = s.chars().collect();
     let mut result = String::new();
     for (i, c) in chars.iter().enumerate() {
-        if i > 0 && (chars.len() - i) % 3 == 0 {
+        if i > 0 && (chars.len() - i).is_multiple_of(3) {
             result.push(',');
         }
         result.push(*c);
@@ -766,6 +936,15 @@ impl GameState {
             current_year: 2025,
             game_over: false,
             messages: vec!["Welcome to Bahay Depot! You are the new CEO. Your first store is open in Quezon City. Set your policies, hire your executive team, and grow the company!".into()],
+            pending_events: vec![],
+            delegation: DelegationSettings::all_false(),
+            decisions_made: 0,
+            decisions_delegated: 0,
+            products: default_product_categories(),
+            upgrades: vec![],
+            board: BoardState::new(),
+            competitors: default_competitors(),
+            achievements: default_achievements(),
         }
     }
 
@@ -784,5 +963,74 @@ impl GameState {
         let q = self.current_quarter;
         let y = self.current_year;
         format!("Q{} {}", q, y)
+    }
+
+    pub fn has_pending_events(&self) -> bool {
+        !self.pending_events.is_empty()
+    }
+
+    pub fn pending_event_count(&self) -> usize {
+        self.pending_events.len()
+    }
+
+    pub fn resolve_pending_event(
+        &mut self,
+        event_id: &str,
+        choice_id: &str,
+    ) -> Option<PendingEvent> {
+        let idx = self.pending_events.iter().position(|e| e.id == event_id)?;
+        let event = self.pending_events.remove(idx);
+        if let Some(choice) = event.choices.iter().find(|c| c.id == choice_id) {
+            apply_event_effects(self, &choice.effects);
+            self.decisions_made += 1;
+            self.event_log.insert(
+                0,
+                GameEvent {
+                    id: event.id.clone(),
+                    title: event.title.clone(),
+                    description: format!("You chose: {}", choice.label),
+                    event_type: category_to_event_type(event.category),
+                    impact: EventImpact {
+                        cash_impact: choice.effects.cash,
+                        revenue_impact: choice.effects.revenue_modifier,
+                        expense_impact: choice.effects.expense_modifier,
+                        morale_impact: choice.effects.morale,
+                        reputation_impact: choice.effects.reputation,
+                        satisfaction_impact: choice.effects.satisfaction,
+                    },
+                    quarter: event.quarter,
+                    year: event.year,
+                },
+            );
+            if self.event_log.len() > 50 {
+                self.event_log.pop();
+            }
+            self.messages
+                .push(format!("[DECISION] {}: {}", event.title, choice.label));
+        }
+        Some(event)
+    }
+}
+
+pub fn apply_event_effects(state: &mut GameState, effects: &EventEffects) {
+    state.company.cash += effects.cash;
+    state.company.brand_reputation =
+        (state.company.brand_reputation + effects.reputation).clamp(5.0, 100.0);
+    state.company.employee_satisfaction =
+        (state.company.employee_satisfaction + effects.morale).clamp(5.0, 100.0);
+    state.company.customer_satisfaction =
+        (state.company.customer_satisfaction + effects.satisfaction).clamp(5.0, 100.0);
+}
+
+fn category_to_event_type(cat: EventCategory) -> EventType {
+    match cat {
+        EventCategory::Crisis => EventType::NaturalDisaster,
+        EventCategory::Financial => EventType::Economic,
+        EventCategory::Marketing => EventType::Marketing,
+        EventCategory::HR => EventType::Employee,
+        EventCategory::SupplyChain => EventType::SupplyChain,
+        EventCategory::Competition => EventType::Competition,
+        EventCategory::Technology => EventType::Positive,
+        EventCategory::Regulation => EventType::Regulation,
     }
 }

@@ -31,6 +31,17 @@ async fn main() {
         .route("/finances/loan", post(api::routes::take_loan))
         .route("/events", get(api::routes::events_page))
         .route("/new-game", get(api::routes::new_game))
+        .route("/decisions", get(api::routes::decisions_page))
+        .route("/decisions/resolve", post(api::routes::resolve_decision))
+        .route("/delegation", get(api::routes::delegation_page))
+        .route("/delegation", post(api::routes::update_delegation))
+        .route("/products", get(api::routes::products_page))
+        .route("/products/invest", post(api::routes::invest_product))
+        .route("/upgrades", get(api::routes::upgrades_page))
+        .route("/upgrades/purchase", post(api::routes::purchase_upgrade))
+        .route("/board", get(api::routes::board_page))
+        .route("/competitors", get(api::routes::competitors_page))
+        .route("/achievements", get(api::routes::achievements_page))
         .with_state(game_state)
         .nest_service("/static", ServeDir::new("static"));
 

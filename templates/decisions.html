@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1 style="font-size: 1.5rem; font-weight: 700; margin-bottom: 0.25rem;">Pending Decisions</h1>
+<p style="color: #64748b; margin-bottom: 1rem;">
+    {{ current_quarter }} &mdash;
+    {% if pending_events.len() == 0 %}
+    No pending decisions. You're all caught up.
+    {% else %}
+    <span style="color: #f59e0b; font-weight: 600;">{{ pending_events.len() }} decisions requiring your attention</span>
+    {% endif %}
+</p>
+
+<div style="display: flex; gap: 1rem; margin-bottom: 1.5rem; font-size: 0.8rem; color: #64748b; flex-wrap: wrap;">
+    <div class="stat-card" style="padding: 0.5rem 1rem; display: flex; align-items: center; gap: 0.5rem;">
+        <span style="color: #a78bfa;">&#9888;</span>
+        Made by you: <strong style="color: #e2e8f0;">{{ decisions_made }}</strong>
+    </div>
+    <div class="stat-card" style="padding: 0.5rem 1rem; display: flex; align-items: center; gap: 0.5rem;">
+        <span style="color: #06b6d4;">&#128640;</span>
+        Delegated: <strong style="color: #e2e8f0;">{{ decisions_delegated }}</strong>
+    </div>
+    <div class="stat-card" style="padding: 0.5rem 1rem;">
+        <a href="/delegation" style="color: #3b82f6; text-decoration: none;">Manage delegation &rarr;</a>
+    </div>
+</div>
+
+{% if messages.len() > 0 %}
+<div style="margin-bottom: 1rem;">
+    {% for msg in messages %}
+    <div class="message {% if msg.starts_with("[DECISION]") %}msg-decision{% else if msg.starts_with("[DELEGATED]") || msg.starts_with("[AUTO]") %}msg-delegated{% else if msg.starts_with("Cannot") || msg.contains("not found") %}msg-error{% else %}msg-info{% endif %}">{{ msg }}</div>
+    {% endfor %}
+</div>
+{% endif %}
+
+{% if pending_events.len() > 0 %}
+<div style="display: flex; flex-direction: column; gap: 1.5rem;">
+    {% for event in pending_events %}
+    <div class="card" style="padding: 1.25rem;">
+        <div style="display: flex; align-items: start; gap: 0.75rem; margin-bottom: 1rem;">
+            <div style="font-size: 1.5rem; flex-shrink: 0;">{{ event.category_icon }}</div>
+            <div style="flex: 1;">
+                <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+                    <h2 style="font-size: 1.1rem; font-weight: 700;">{{ event.title }}</h2>
+                    <span style="background: #334155; color: #94a3b8; font-size: 0.7rem; padding: 0.15rem 0.5rem; border-radius: 9999px;">{{ event.category }}</span>
+                </div>
+                <p style="color: #94a3b8; font-size: 0.9rem; margin-top: 0.25rem;">{{ event.description }}</p>
+            </div>
+        </div>
+
+        <div style="font-size: 0.75rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.75rem;">Choose your response:</div>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 0.75rem;">
+            {% for choice in event.choices %}
+            <form action="/decisions/resolve" method="POST" style="display: contents;">
+                <input type="hidden" name="event_id" value="{{ event.id }}">
+                <input type="hidden" name="choice_id" value="{{ choice.id }}">
+                <button type="submit" class="choice-card risk-{{ choice.risk_css }}" style="display: block; text-align: left; width: 100%; font-family: inherit; font-size: inherit; color: inherit;">
+                    <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 0.5rem;">
+                        <strong style="color: #e2e8f0;">{{ choice.label }}</strong>
+                        <span class="{{ choice.risk_class }}" style="font-size: 0.7rem; font-weight: 600; white-space: nowrap; background: #334155; padding: 0.1rem 0.4rem; border-radius: 0.25rem;">{{ choice.risk_level }}</span>
+                    </div>
+                    <p style="color: #94a3b8; font-size: 0.85rem; margin-bottom: 0.75rem;">{{ choice.description }}</p>
+                    <div style="display: flex; gap: 0.75rem; flex-wrap: wrap; font-size: 0.75rem;">
+                        {% if choice.cash != "-" %}<span style="color: {% if choice.cash.starts_with("-") %}#ef4444{% else %}#22c55e{% endif %};">Cash: {{ choice.cash }}</span>{% endif %}
+                        {% if choice.morale != "-" %}<span style="color: {% if choice.morale.starts_with("-") %}#ef4444{% else %}#22c55e{% endif %};">Morale: {{ choice.morale }}</span>{% endif %}
+                        {% if choice.reputation != "-" %}<span style="color: {% if choice.reputation.starts_with("-") %}#ef4444{% else %}#22c55e{% endif %};">Rep: {{ choice.reputation }}</span>{% endif %}
+                        {% if choice.satisfaction != "-" %}<span style="color: {% if choice.satisfaction.starts_with("-") %}#ef4444{% else %}#22c55e{% endif %};">Sat: {{ choice.satisfaction }}</span>{% endif %}
+                    </div>
+                </button>
+            </form>
+            {% endfor %}
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="card" style="padding: 3rem; text-align: center;">
+    <div style="font-size: 3rem; margin-bottom: 1rem;">&#9989;</div>
+    <h2 style="font-size: 1.25rem; font-weight: 600; color: #22c55e; margin-bottom: 0.5rem;">All Clear</h2>
+    <p style="color: #94a3b8; margin-bottom: 1.5rem;">No decisions pending. Head to the dashboard to advance the quarter.</p>
+    <a href="/" class="btn-primary" style="display: inline-block; text-decoration: none;">&#8592; Back to Dashboard</a>
+</div>
+{% endif %}
+
+{% endblock %}

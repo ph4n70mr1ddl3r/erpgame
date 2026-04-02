@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1 style="font-size: 1.5rem; font-weight: 700; margin-bottom: 0.25rem;">Store Upgrades</h1>
+<p style="color: #64748b; margin-bottom: 1rem;">Improve individual stores with upgrades. Cash: <span style="color: #22c55e;">{{ cash }}</span></p>
+
+{% if messages.len() > 0 %}
+<div style="margin-bottom: 1rem;">
+    {% for msg in messages %}
+    <div class="message {% if msg.starts_with("Cannot") || msg.starts_with("Already") %}msg-error{% else %}msg-info{% endif %}">{{ msg }}</div>
+    {% endfor %}
+</div>
+{% endif %}
+
+{% if store_rows.len() == 0 %}
+<div class="card" style="padding: 2rem; text-align: center;">
+    <p style="color: #64748b;">No operating stores to upgrade.</p>
+</div>
+{% else %}
+<div style="display: grid; gap: 1.5rem;">
+    {% for store in store_rows %}
+    <div class="card" style="padding: 1rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.5rem;">
+            <div>
+                <h3 style="font-size: 1.1rem; font-weight: 700;">{{ store.store_name }}</h3>
+                <span style="color: #64748b; font-size: 0.85rem;">{{ store.store_city }}</span>
+            </div>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0.75rem;">
+            {% for u in store.upgrade_rows %}
+            <div style="background: #0f172a; border-radius: 0.5rem; padding: 0.75rem; border: 1px solid #334155;">
+                <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 0.5rem;">
+                    <div style="font-weight: 600; font-size: 0.9rem;">{{ u.upgrade_type }}</div>
+                    <span style="background: #334155; color: #94a3b8; font-size: 0.7rem; padding: 0.1rem 0.4rem; border-radius: 9999px;">{{ u.current_level }}/{{ u.max_level }}</span>
+                </div>
+                <p style="font-size: 0.8rem; color: #64748b; margin-bottom: 0.5rem;">{{ u.description }}</p>
+                <div style="display: flex; gap: 0.75rem; font-size: 0.75rem; margin-bottom: 0.5rem; flex-wrap: wrap;">
+                    {% if u.revenue_effect != "-" %}<span style="color: #22c55e;">Rev: {{ u.revenue_effect }}</span>{% endif %}
+                    {% if u.cost_effect != "-" %}<span style="color: #3b82f6;">Cost: {{ u.cost_effect }}</span>{% endif %}
+                    {% if u.sat_effect != "-" %}<span style="color: #f59e0b;">Sat: {{ u.sat_effect }}</span>{% endif %}
+                </div>
+                {% if u.can_upgrade %}
+                <form action="/upgrades/purchase" method="POST">
+                    <input type="hidden" name="store_id" value="{{ store.store_id }}">
+                    <input type="hidden" name="upgrade_type" value="{{ u.upgrade_key }}">
+                    <button type="submit" class="btn-primary btn-sm" onclick="return confirm('Upgrade {{ u.upgrade_type }} for {{ u.cost }}?')">Upgrade ({{ u.cost }})</button>
+                </form>
+                {% else %}
+                <span style="font-size: 0.8rem; color: #22c55e;">MAX LEVEL</span>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+{% endblock %}

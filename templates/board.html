@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1 style="font-size: 1.5rem; font-weight: 700; margin-bottom: 0.25rem;">Board of Directors</h1>
+<p style="color: #64748b; margin-bottom: 1rem;">Annual board reviews happen at Q4. Keep the board satisfied to maintain your position as CEO.</p>
+
+{% if messages.len() > 0 %}
+<div style="margin-bottom: 1rem;">
+    {% for msg in messages %}
+    <div class="message {% if msg.starts_with("[BOARD]") %}msg-event{% else %}msg-info{% endif %}">{{ msg }}</div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+    <div class="stat-card">
+        <div style="color: #64748b; font-size: 0.8rem; text-transform: uppercase;">Board Patience</div>
+        <div style="font-size: 1.75rem; font-weight: 700;" class="{{ board.patience_class }}">{{ board.patience }}</div>
+        <div class="progress-bar" style="margin-top: 0.5rem;"><div class="progress-fill" style="width: {{ board.patience }}; background: {{ board.patience_color }};"></div></div>
+    </div>
+    <div class="stat-card">
+        <div style="color: #64748b; font-size: 0.8rem; text-transform: uppercase;">Pressure Level</div>
+        <div style="font-size: 1.75rem; font-weight: 700;" class="{{ board.pressure_class }}">{{ board.pressure }}</div>
+    </div>
+    <div class="stat-card">
+        <div style="color: #64748b; font-size: 0.8rem; text-transform: uppercase;">Warnings Received</div>
+        <div style="font-size: 1.75rem; font-weight: 700; {% if board.warnings > 0 %}color: #ef4444{% endif %}">{{ board.warnings }}</div>
+    </div>
+    <div class="stat-card">
+        <div style="color: #64748b; font-size: 0.8rem; text-transform: uppercase;">Next Review</div>
+        <div style="font-size: 1.25rem; font-weight: 600;">{{ board.quarters_until_review }} quarters</div>
+        <div style="font-size: 0.75rem; color: #64748b;">Last: {{ board.last_review }}</div>
+    </div>
+</div>
+
+<div class="card" style="padding: 1rem; margin-bottom: 1.5rem; border-left: 4px solid {{ board.patience_color }};">
+    <h3 style="font-size: 0.9rem; font-weight: 600; margin-bottom: 0.5rem; color: #f59e0b;">BOARD ASSESSMENT</h3>
+    <p style="font-size: 0.9rem;">{{ board.description }}</p>
+</div>
+
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem;">
+    <div class="card" style="padding: 1rem;">
+        <h3 style="font-size: 0.9rem; font-weight: 600; margin-bottom: 0.75rem; color: #94a3b8;">YOUR METRICS</h3>
+        <div style="display: grid; gap: 0.5rem; font-size: 0.9rem;">
+            <div>Company Value: <span style="color: #a78bfa; font-weight: 600;">{{ company_value }}</span></div>
+            <div>Your Market Share: <span style="color: #3b82f6; font-weight: 600;">{{ market_share }}</span></div>
+        </div>
+    </div>
+    <div class="card" style="padding: 1rem;">
+        <h3 style="font-size: 0.9rem; font-weight: 600; margin-bottom: 0.75rem; color: #94a3b8;">COMPETITOR SHARE</h3>
+        <div style="font-size: 0.9rem;">
+            <div>Combined Competitor Share: <span style="color: #f59e0b; font-weight: 600;">{{ competitor_share }}</span></div>
+        </div>
+    </div>
+</div>
+
+<div class="card" style="padding: 1rem;">
+    <h3 style="font-size: 0.9rem; font-weight: 600; margin-bottom: 0.5rem; color: #94a3b8;">HOW BOARD REVIEWS WORK</h3>
+    <ul style="font-size: 0.85rem; color: #94a3b8; padding-left: 1.25rem; line-height: 1.8;">
+        <li>Board reviews happen <strong style="color: #e2e8f0;">annually at Q4</strong></li>
+        <li>Board expects <strong style="color: #e2e8f0;">positive profit margins</strong> and revenue growth</li>
+        <li><strong style="color: #e2e8f0;">5+ stores</strong> and growing market share boost patience</li>
+        <li>Consistent losses or low market share <strong style="color: #ef4444;">decrease patience</strong></li>
+        <li>3+ warnings put your position as CEO at risk</li>
+        <li>If patience reaches <strong style="color: #ef4444;">0%</strong>, you are removed as CEO</li>
+    </ul>
+</div>
+
+{% endblock %}

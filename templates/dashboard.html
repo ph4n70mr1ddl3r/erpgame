@@ -9,7 +9,7 @@
 {% if messages.len() > 0 %}
 <div class="card" style="padding: 1rem; margin-bottom: 1.5rem;">
     {% for msg in messages %}
-    <div class="message {% if msg.starts_with("[EVENT]") %}msg-event{% else if msg.starts_with("GAME OVER") || msg.starts_with("CONGRATULATIONS") %}msg-error{% else if msg.starts_with("Cannot") || msg.contains("error") %}msg-error{% else %}msg-info{% endif %}">
+    <div class="message {% if msg.starts_with("[EVENT]") %}msg-event{% else if msg.starts_with("GAME OVER") || msg.starts_with("CONGRATULATIONS") %}msg-error{% else if msg.starts_with("[DECISION]") %}msg-decision{% else if msg.starts_with("[DELEGATED]") || msg.starts_with("[AUTO]") %}msg-delegated{% else if msg.starts_with("Cannot") || msg.contains("error") %}msg-error{% else if msg.starts_with("Q") %}msg-success{% else %}msg-info{% endif %}">
         {{ msg }}
     </div>
     {% endfor %}
@@ -37,6 +37,7 @@
     <div class="stat-card">
         <div style="color: #64748b; font-size: 0.8rem; text-transform: uppercase;">Company Value</div>
         <div style="font-size: 1.5rem; font-weight: 700; color: #a78bfa;">{{ company_value }}</div>
+        <div style="font-size: 0.7rem; color: #64748b;">Goal: ₱10B</div>
     </div>
 </div>
 
@@ -62,9 +63,14 @@
         <div class="progress-bar"><div class="progress-fill" style="width: {{ brand_reputation }}; background: #a78bfa;"></div></div>
     </div>
     <div class="stat-card">
+        <div style="color: #64748b; font-size: 0.75rem; text-transform: uppercase;">Board Patience</div>
+        <div style="font-size: 1.25rem; font-weight: 600;" class="{{ board_patience_class }}">{{ board_patience }}</div>
+        <div class="progress-bar"><div class="progress-fill" style="width: {{ board_patience }}; background: {{ board_patience_color }};"></div></div>
+    </div>
+    <div class="stat-card">
         <div style="color: #64748b; font-size: 0.75rem; text-transform: uppercase;">Stores / Employees</div>
         <div style="font-size: 1.25rem; font-weight: 600;">{{ store_count }} / {{ employee_count }}</div>
-        <div style="font-size: 0.75rem; color: #64748b;">{{ executive_count }} executives</div>
+        <div style="font-size: 0.75rem; color: #64748b;">{{ executive_count }} executives | {{ achievements_unlocked }}/{{ achievements_total }} achievements</div>
     </div>
 </div>
 
@@ -83,8 +89,8 @@
         <h3 style="font-size: 0.9rem; font-weight: 600; margin-bottom: 0.75rem; color: #94a3b8;">MARKET CONDITIONS</h3>
         <div style="font-size: 0.85rem;">
             <div style="margin-bottom: 0.25rem;">{{ competition_description }}</div>
-            <div style="color: #64748b;">Win condition: Reach ₱10B+ company value</div>
-            <div style="color: #64748b;">Lose condition: Cash drops below -₱10M</div>
+            <div style="color: #64748b;">Win: Reach ₱10B+ company value</div>
+            <div style="color: #64748b;">Lose: Cash drops below -₱10M</div>
         </div>
     </div>
 </div>
@@ -102,6 +108,67 @@
 </div>
 
 {% if financial_history.len() > 0 %}
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem;">
+    <div class="card" style="padding: 1rem;">
+        <h3 style="font-size: 0.9rem; font-weight: 600; margin-bottom: 0.75rem; color: #94a3b8;">REVENUE & PROFIT TREND (Millions)</h3>
+        <canvas id="revenueChart" height="200"></canvas>
+    </div>
+    <div class="card" style="padding: 1rem;">
+        <h3 style="font-size: 0.9rem; font-weight: 600; margin-bottom: 0.75rem; color: #94a3b8;">KEY METRICS</h3>
+        <canvas id="metricsChart" height="200"></canvas>
+    </div>
+</div>
+<script>
+(function() {
+    var data = {{ chart_json|safe }};
+    if (data.labels.length === 0) return;
+
+    var chartDefaults = {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { labels: { color: '#94a3b8', font: { size: 11 } } } },
+        scales: {
+            x: { ticks: { color: '#64748b', font: { size: 10 } }, grid: { color: '#1e293b' } },
+            y: { ticks: { color: '#64748b', font: { size: 10 } }, grid: { color: '#1e293b' } }
+        }
+    };
+
+    new Chart(document.getElementById('revenueChart'), {
+        type: 'line',
+        data: {
+            labels: data.labels,
+            datasets: [
+                { label: 'Revenue', data: data.revenue, borderColor: '#3b82f6', backgroundColor: 'rgba(59,130,246,0.1)', fill: true, tension: 0.3 },
+                { label: 'Expenses', data: data.expenses, borderColor: '#f59e0b', backgroundColor: 'rgba(245,158,11,0.1)', fill: true, tension: 0.3 },
+                { label: 'Profit', data: data.profit, borderColor: '#22c55e', backgroundColor: 'rgba(34,197,94,0.1)', fill: true, tension: 0.3 }
+            ]
+        },
+        options: chartDefaults
+    });
+
+    new Chart(document.getElementById('metricsChart'), {
+        type: 'line',
+        data: {
+            labels: data.labels,
+            datasets: [
+                { label: 'Market Share %', data: data.market_share, borderColor: '#3b82f6', tension: 0.3, yAxisID: 'y' },
+                { label: 'Customer Sat %', data: data.customer_sat, borderColor: '#22c55e', tension: 0.3, yAxisID: 'y' },
+                { label: 'Brand Rep %', data: data.brand_rep, borderColor: '#a78bfa', tension: 0.3, yAxisID: 'y' },
+                { label: 'Cash (M)', data: data.cash, borderColor: '#f59e0b', tension: 0.3, yAxisID: 'y1' }
+            ]
+        },
+        options: {
+            ...chartDefaults,
+            scales: {
+                x: { ticks: { color: '#64748b', font: { size: 10 } }, grid: { color: '#1e293b' } },
+                y: { type: 'linear', position: 'left', ticks: { color: '#64748b' }, grid: { color: '#1e293b' }, title: { display: true, text: '%', color: '#64748b' } },
+                y1: { type: 'linear', position: 'right', ticks: { color: '#64748b' }, grid: { display: false }, title: { display: true, text: 'M', color: '#64748b' } }
+            }
+        }
+    });
+})();
+</script>
+
 <div class="card" style="padding: 1rem; overflow-x: auto;">
     <h3 style="font-size: 0.9rem; font-weight: 600; margin-bottom: 0.75rem; color: #94a3b8;">QUARTERLY FINANCIAL HISTORY</h3>
     <table>

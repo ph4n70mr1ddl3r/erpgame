@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1 style="font-size: 1.5rem; font-weight: 700; margin-bottom: 0.25rem;">Delegation Settings</h1>
+<p style="color: #64748b; margin-bottom: 1rem;">Configure which event categories are auto-delegated to your executives. Delegated events are resolved automatically based on the relevant executive's skill level.</p>
+
+{% if messages.len() > 0 %}
+<div style="margin-bottom: 1rem;">
+    {% for msg in messages %}
+    <div class="message msg-info">{{ msg }}</div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<div class="card" style="padding: 1rem; margin-bottom: 1.5rem;">
+    <h3 style="font-size: 0.9rem; font-weight: 600; margin-bottom: 0.5rem; color: #f59e0b;">How Delegation Works</h3>
+    <ul style="font-size: 0.85rem; color: #94a3b8; padding-left: 1.25rem; line-height: 1.6;">
+        <li>When a category is delegated, events are auto-resolved each quarter</li>
+        <li>The relevant executive picks the best choice based on their skill (skill/100 chance)</li>
+        <li>If no executive is hired for a delegated category, a random choice is made</li>
+        <li>Undelegated events appear in the Decisions page for you to choose manually</li>
+    </ul>
+</div>
+
+<form action="/delegation" method="POST">
+<div style="display: grid; gap: 1rem;">
+    {% for row in rows %}
+    <div class="card" style="padding: 1rem; display: grid; grid-template-columns: auto 1fr auto; gap: 1rem; align-items: center;">
+        <div style="font-size: 1.5rem;">{{ row.icon }}</div>
+        <div>
+            <div style="font-weight: 600; font-size: 0.95rem;">{{ row.category }}</div>
+            <div style="font-size: 0.8rem; color: #64748b;">Delegates to: <span style="color: #f59e0b;">{{ row.delegate_to }}</span>
+                {% if row.has_executive %}
+                <span style="color: #22c55e;">(Hired)</span>
+                {% else %}
+                <span style="color: #ef4444;">(Not Hired)</span>
+                {% endif %}
+            </div>
+        </div>
+        <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+            <input type="checkbox" name="{{ row.key }}" {% if row.is_delegated %}checked{% endif %} style="width: 1.2rem; height: 1.2rem; accent-color: #f59e0b;">
+            <span style="font-size: 0.85rem;">Delegate</span>
+        </label>
+    </div>
+    {% endfor %}
+
+    <div style="text-align: center;">
+        <button type="submit" class="btn-primary" style="padding: 0.75rem 2rem; font-size: 1rem;">Update Delegation Settings</button>
+    </div>
+</div>
+</form>
+
+{% endblock %}

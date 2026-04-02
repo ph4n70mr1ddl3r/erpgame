@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1 style="font-size: 1.5rem; font-weight: 700; margin-bottom: 0.25rem;">Product Categories</h1>
+<p style="color: #64748b; margin-bottom: 1rem;">Manage your product mix. Invest in categories to boost revenue and margins. Cash: <span style="color: #22c55e;">{{ cash }}</span> | Total invested: <span style="color: #f59e0b;">{{ total_invested }}</span></p>
+
+{% if messages.len() > 0 %}
+<div style="margin-bottom: 1rem;">
+    {% for msg in messages %}
+    <div class="message {% if msg.starts_with("Cannot") %}msg-error{% else %}msg-info{% endif %}">{{ msg }}</div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<div class="card" style="padding: 1rem; margin-bottom: 1.5rem;">
+    <h3 style="font-size: 0.9rem; font-weight: 600; margin-bottom: 0.5rem; color: #94a3b8;">PRODUCT PORTFOLIO</h3>
+    <p style="font-size: 0.8rem; color: #64748b; margin-bottom: 1rem;">Invest P500K-P2.5M per category to increase revenue contribution and margins. Investment decays slowly over time.</p>
+    <div style="overflow-x: auto;">
+        <table>
+            <thead>
+                <tr>
+                    <th>Category</th><th>Margin</th><th>Demand</th><th>Investment</th><th>Trend</th><th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for p in rows %}
+                <tr>
+                    <td style="font-weight: 600;">{{ p.name }}</td>
+                    <td style="color: #22c55e;">{{ p.margin }}</td>
+                    <td>{{ p.demand }}</td>
+                    <td>
+                        <div style="display: flex; align-items: center; gap: 0.5rem;">
+                            <div class="progress-bar" style="width: 80px;">
+                                <div class="progress-fill" style="width: {{ p.investment_pct }}%; background: #3b82f6;"></div>
+                            </div>
+                            <span style="font-size: 0.8rem;">{{ p.investment }}</span>
+                        </div>
+                    </td>
+                    <td class="{{ p.trend_class }}">{{ p.trend }}</td>
+                    <td>
+                        <form action="/products/invest" method="POST" style="display: flex; gap: 0.3rem; align-items: center;">
+                            <input type="hidden" name="category_id" value="{{ p.id }}">
+                            <input type="number" name="amount" value="500000" step="100000" min="500000" max="2500000" style="width: 120px; font-size: 0.8rem; padding: 0.25rem 0.4rem;">
+                            <button type="submit" class="btn-primary btn-sm" {% if p.investment_pct >= 100.0 %}disabled style="opacity:0.5"{% endif %}>Invest</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="card" style="padding: 1rem;">
+    <h3 style="font-size: 0.9rem; font-weight: 600; margin-bottom: 0.5rem; color: #94a3b8;">HOW PRODUCT CATEGORIES WORK</h3>
+    <ul style="font-size: 0.85rem; color: #94a3b8; padding-left: 1.25rem; line-height: 1.8;">
+        <li>Each category has its own <strong style="color: #e2e8f0;">margin rate</strong> (profit per sale) and <strong style="color: #e2e8f0;">demand factor</strong> (customer interest)</li>
+        <li><strong style="color: #e2e8f0;">Investment</strong> increases both revenue contribution and effective margins for that category</li>
+        <li>Building Materials demand rises with the <strong style="color: #e2e8f0;">Construction Index</strong> in the economy</li>
+        <li>Garden & Outdoor demand is <strong style="color: #e2e8f0;">seasonal</strong> (peaks Q2-Q3)</li>
+        <li>Paint demand spikes in <strong style="color: #e2e8f0;">Q4</strong> (holiday renovation season)</li>
+        <li>Investment <strong style="color: #e2e8f0;">decays 0.5%</strong> per quarter - reinvest to maintain levels</li>
+        <li>Higher average investment across categories boosts overall store revenue</li>
+    </ul>
+</div>
+
+{% endblock %}

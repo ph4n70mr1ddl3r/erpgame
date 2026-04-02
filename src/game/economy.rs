@@ -40,7 +40,6 @@ impl PricingPolicy {
             PricingPolicy::Dynamic => "Dynamic (AI-adjusted pricing)",
         }
     }
-
     pub fn key(&self) -> &str {
         match self {
             PricingPolicy::Budget => "budget",
@@ -60,7 +59,6 @@ impl HrPolicy {
             HrPolicy::Elite => "Elite (Top-tier benefits & perks)",
         }
     }
-
     pub fn key(&self) -> &str {
         match self {
             HrPolicy::Minimal => "minimal",
@@ -80,7 +78,6 @@ impl ExpansionPolicy {
             ExpansionPolicy::Blitz => "Blitz (Maximum speed expansion)",
         }
     }
-
     pub fn key(&self) -> &str {
         match self {
             ExpansionPolicy::Conservative => "conservative",
@@ -100,7 +97,6 @@ impl CustomerServicePolicy {
             CustomerServicePolicy::WhiteGlove => "White Glove (Premium concierge service)",
         }
     }
-
     pub fn key(&self) -> &str {
         match self {
             CustomerServicePolicy::Basic => "basic",
@@ -120,7 +116,6 @@ impl MarketingPolicy {
             MarketingPolicy::Aggressive => "Aggressive (Maximum market presence)",
         }
     }
-
     pub fn key(&self) -> &str {
         match self {
             MarketingPolicy::LowKey => "lowkey",
@@ -140,7 +135,6 @@ impl InventoryPolicy {
             InventoryPolicy::Abundant => "Abundant (Maximum availability)",
         }
     }
-
     pub fn key(&self) -> &str {
         match self {
             InventoryPolicy::Lean => "lean",
@@ -159,7 +153,6 @@ impl StoreStatus {
             StoreStatus::Closed => "Closed",
         }
     }
-
     pub fn css_class(&self) -> &str {
         match self {
             StoreStatus::Operating => "text-green-400",

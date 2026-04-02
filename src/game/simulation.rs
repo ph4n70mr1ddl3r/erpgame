@@ -1,6 +1,18 @@
 use rand::Rng;
 
+use super::achievements::check_achievements;
+use super::board::update_board;
+use super::competitors::{
+    average_competitor_strength, total_competitor_market_share, update_competitors,
+};
+use super::events::{generate_auto_events, generate_pending_events};
+use super::products::{
+    total_product_margin_modifier, total_product_revenue_modifier, update_product_categories,
+};
 use super::state::*;
+use super::upgrades::{
+    get_store_cost_modifier, get_store_revenue_modifier, get_store_satisfaction_modifier,
+};
 
 fn find_exec_skill(state: &GameState, position: ExecutivePosition) -> Option<f64> {
     state
@@ -24,6 +36,20 @@ pub fn simulate_quarter(state: &mut GameState) {
     update_economy(state, &mut rng);
     update_seasonality(state, quarter);
     process_store_construction(state);
+    update_product_categories(
+        &mut state.products,
+        &mut rng,
+        state.economy.construction_index,
+        quarter,
+    );
+    update_competitors(
+        &mut state.competitors,
+        &mut rng,
+        state.company.market_share,
+        &mut state.messages,
+    );
+    state.market.competitor_count = state.competitors.iter().map(|c| c.store_count).sum();
+    state.market.competitor_strength = average_competitor_strength(&state.competitors);
 
     let operating_count = state.operating_store_count();
     let cfo_skill = find_exec_skill(state, ExecutivePosition::CFO);
@@ -42,9 +68,25 @@ pub fn simulate_quarter(state: &mut GameState) {
     let total_expenses = calculate_expenses(state, operating_count, cto_skill);
     let loan_payments = process_loans(state);
     let event_impacts = process_random_events(state, &mut rng);
+
+    process_pending_event_generation(state, &mut rng);
     process_executive_decisions(state, &mut rng);
     update_employees(state, &mut rng);
     update_company_metrics(state, &mut rng);
+
+    let operating_count = state.operating_store_count();
+    let board_game_over = update_board(
+        &mut state.board,
+        total_revenue,
+        total_expenses,
+        state.company.market_share,
+        operating_count,
+        quarter,
+        state.current_year,
+        &mut state.messages,
+    );
+
+    check_achievements(state, total_revenue);
 
     let gross_profit = total_revenue - total_expenses;
     let net_profit = gross_profit - loan_payments - event_impacts.cash_impact;
@@ -96,6 +138,10 @@ pub fn simulate_quarter(state: &mut GameState) {
         );
     }
 
+    if board_game_over {
+        state.game_over = true;
+    }
+
     if state.company.company_value >= 10_000_000_000.0 {
         state.game_over = true;
         state.messages.push(
@@ -105,15 +151,140 @@ pub fn simulate_quarter(state: &mut GameState) {
     }
 
     let summary = format!(
-        "Q{} {} | Revenue: {} | Expenses: {} | Profit: {} | Cash: {}",
-        quarter,
-        state.current_year,
-        format_currency(total_revenue),
-        format_currency(total_expenses),
-        format_currency(final_profit),
-        format_currency(state.company.cash),
+        "Q{} {} | Revenue: {} | Expenses: {} | Profit: {} | Cash: {} | Decisions: {} made, {} delegated",
+        quarter, state.current_year,
+        format_currency(total_revenue), format_currency(total_expenses),
+        format_currency(final_profit), format_currency(state.company.cash),
+        state.decisions_made, state.decisions_delegated,
     );
     state.messages.push(summary);
+}
+
+fn process_pending_event_generation(state: &mut GameState, rng: &mut rand::rngs::ThreadRng) {
+    let pending = generate_pending_events(state, rng);
+    for event in pending {
+        if state.delegation.is_delegated(event.category) {
+            auto_resolve_event(state, &event, rng);
+        } else {
+            state.pending_events.push(event);
+        }
+    }
+}
+
+fn auto_resolve_event(
+    state: &mut GameState,
+    event: &PendingEvent,
+    rng: &mut rand::rngs::ThreadRng,
+) {
+    let delegate_pos = event.category.delegate_position();
+    let exec_info = state
+        .executives
+        .iter()
+        .find(|e| e.position == delegate_pos)
+        .map(|e| (e.position.short_title().to_string(), e.skill));
+    if let Some((exec_title, exec_skill)) = exec_info {
+        let best_idx = find_best_choice(&event.choices);
+        let pick_best = rng.gen_bool(exec_skill / 100.0);
+        let choice_idx = if pick_best {
+            best_idx
+        } else {
+            rng.gen_range(0..event.choices.len())
+        };
+        let choice = &event.choices[choice_idx];
+        apply_event_effects(state, &choice.effects);
+        state.decisions_delegated += 1;
+        state.event_log.insert(
+            0,
+            GameEvent {
+                id: event.id.clone(),
+                title: event.title.clone(),
+                description: format!("[DELEGATED] {} chose: {}", exec_title, choice.label),
+                event_type: category_to_event_type(event.category),
+                impact: EventImpact {
+                    cash_impact: choice.effects.cash,
+                    revenue_impact: choice.effects.revenue_modifier,
+                    expense_impact: choice.effects.expense_modifier,
+                    morale_impact: choice.effects.morale,
+                    reputation_impact: choice.effects.reputation,
+                    satisfaction_impact: choice.effects.satisfaction,
+                },
+                quarter: event.quarter,
+                year: event.year,
+            },
+        );
+        if state.event_log.len() > 50 {
+            state.event_log.pop();
+        }
+        state.messages.push(format!(
+            "[DELEGATED] {} decided on '{}': {}",
+            exec_title, event.title, choice.label
+        ));
+    } else {
+        let delegate_title = delegate_pos.short_title().to_string();
+        let choice_idx = rng.gen_range(0..event.choices.len());
+        let choice = &event.choices[choice_idx];
+        apply_event_effects(state, &choice.effects);
+        state.decisions_delegated += 1;
+        state.event_log.insert(
+            0,
+            GameEvent {
+                id: event.id.clone(),
+                title: event.title.clone(),
+                description: format!(
+                    "[AUTO] No {} hired, random: {}",
+                    delegate_title, choice.label
+                ),
+                event_type: category_to_event_type(event.category),
+                impact: EventImpact {
+                    cash_impact: choice.effects.cash,
+                    revenue_impact: choice.effects.revenue_modifier,
+                    expense_impact: choice.effects.expense_modifier,
+                    morale_impact: choice.effects.morale,
+                    reputation_impact: choice.effects.reputation,
+                    satisfaction_impact: choice.effects.satisfaction,
+                },
+                quarter: event.quarter,
+                year: event.year,
+            },
+        );
+        if state.event_log.len() > 50 {
+            state.event_log.pop();
+        }
+        state.messages.push(format!(
+            "[AUTO] No {} hired, random decision on '{}': {}",
+            delegate_title, event.title, choice.label
+        ));
+    }
+}
+
+fn find_best_choice(choices: &[EventChoice]) -> usize {
+    let mut best_idx = 0;
+    let mut best_score: f64 = f64::NEG_INFINITY;
+    for (i, c) in choices.iter().enumerate() {
+        let score = c.effects.reputation
+            + c.effects.morale
+            + c.effects.satisfaction
+            + c.effects.revenue_modifier * 50.0
+            - c.effects.expense_modifier / 1_000_000.0;
+        if score > best_score {
+            best_score = score;
+            best_idx = i;
+        }
+    }
+    best_idx
+}
+
+fn category_to_event_type(cat: EventCategory) -> EventType {
+    match cat {
+        EventCategory::Crisis => EventType::NaturalDisaster,
+        EventCategory::Financial => EventType::Economic,
+        EventCategory::Marketing => EventType::Marketing,
+        EventCategory::HR => EventType::Employee,
+        EventCategory::SupplyChain => EventType::SupplyChain,
+        EventCategory::Competition => EventType::Competition,
+        EventCategory::Technology => EventType::Positive,
+        EventCategory::Regulation => EventType::Regulation,
+    }
 }
 
 fn update_economy(state: &mut GameState, rng: &mut rand::rngs::ThreadRng) {
@@ -206,6 +377,10 @@ fn calculate_revenue(
     let coo_bonus = 1.0 + coo_skill.unwrap_or(0.0) * 0.003;
     let cmo_bonus = 1.0 + cmo_skill.unwrap_or(0.0) * 0.003;
 
+    let product_rev_mult = total_product_revenue_modifier(&state.products);
+    let _product_margin_mult = total_product_margin_modifier(&state.products);
+    let _competitor_market_share = total_competitor_market_share(&state.competitors);
+
     let mut total_revenue = 0.0;
 
     for store in &mut state.stores {
@@ -227,7 +402,7 @@ fn calculate_revenue(
         } else {
             1.0
         };
-
+        let upgrade_rev_mult = get_store_revenue_modifier(&state.upgrades, &store.id);
         let noise = rng.gen_range(0.95..1.05);
 
         let store_revenue = base_revenue
@@ -246,12 +421,13 @@ fn calculate_revenue(
             * cfo_bonus
             * coo_bonus
             * cmo_bonus
+            * product_rev_mult
+            * upgrade_rev_mult
             * noise;
 
         let store_revenue = store_revenue.max(0.0);
         store.quarterly_revenue = store_revenue;
         store.customer_count = (store_revenue / 500.0 * rng.gen_range(0.8..1.2)) as u32;
-
         total_revenue += store_revenue;
     }
 
@@ -280,7 +456,7 @@ fn calculate_expenses(state: &mut GameState, operating_count: u32, cto_skill: Op
         };
 
     let cto_cost_reduction = 1.0 - cto_skill.unwrap_or(0.0) * 0.001;
-
+    let product_cost_factor = 1.0 + (1.0 - total_product_margin_modifier(&state.products)) * 0.3;
     let mut total_expenses = 0.0;
 
     for store in &mut state.stores {
@@ -295,7 +471,6 @@ fn calculate_expenses(state: &mut GameState, operating_count: u32, cto_skill: Op
             .find(|c| c.name == store.city)
             .map(|c| c.rent_per_sqm)
             .unwrap_or(500.0);
-
         let monthly_rent = store.size_sqm as f64 * rent_rate;
         let quarterly_rent = monthly_rent * 3.0;
 
@@ -307,9 +482,7 @@ fn calculate_expenses(state: &mut GameState, operating_count: u32, cto_skill: Op
         store.employee_count = employee_count;
 
         let quarterly_payroll = employee_count as f64 * avg_salary * 3.0;
-
         let utilities = store.size_sqm as f64 * 150.0 * 3.0;
-
         let inventory_cost = if store.status == StoreStatus::Operating {
             store.quarterly_revenue
                 * match state.policies.inventory {
@@ -318,31 +491,30 @@ fn calculate_expenses(state: &mut GameState, operating_count: u32, cto_skill: Op
                     InventoryPolicy::Buffered => 0.50,
                     InventoryPolicy::Abundant => 0.60,
                 }
+                * product_cost_factor
         } else {
             0.0
         };
-
         let maintenance = store.size_sqm as f64 * 80.0 * 3.0;
-
         let service_cost = match state.policies.customer_service {
             CustomerServicePolicy::Basic => 0.0,
             CustomerServicePolicy::Good => employee_count as f64 * 2000.0 * 3.0,
             CustomerServicePolicy::Excellent => employee_count as f64 * 4000.0 * 3.0,
             CustomerServicePolicy::WhiteGlove => employee_count as f64 * 7000.0 * 3.0,
         };
-
         let hr_cost = match state.policies.hr {
             HrPolicy::Minimal => 0.0,
             HrPolicy::Standard => employee_count as f64 * 1000.0 * 3.0,
             HrPolicy::Generous => employee_count as f64 * 2500.0 * 3.0,
             HrPolicy::Elite => employee_count as f64 * 5000.0 * 3.0,
         };
-
         let construction_cost = if store.status == StoreStatus::UnderConstruction {
             store.store_type.opening_cost() / store.store_type.construction_quarters() as f64
         } else {
             0.0
         };
+
+        let upgrade_cost_mult = get_store_cost_modifier(&state.upgrades, &store.id);
 
         let mut store_expenses = quarterly_rent
             + quarterly_payroll
@@ -353,9 +525,7 @@ fn calculate_expenses(state: &mut GameState, operating_count: u32, cto_skill: Op
             + service_cost
             + hr_cost
             + construction_cost;
-
-        store_expenses *= cto_cost_reduction;
-
+        store_expenses *= cto_cost_reduction * upgrade_cost_mult;
         store.quarterly_expenses = store_expenses;
         total_expenses += store_expenses;
     }
@@ -366,14 +536,10 @@ fn calculate_expenses(state: &mut GameState, operating_count: u32, cto_skill: Op
         .map(|e| e.salary_monthly * 3.0)
         .sum();
     total_expenses += executive_payroll;
-
-    let corporate_overhead = 500_000.0 * 3.0;
-    total_expenses += corporate_overhead;
+    total_expenses += 500_000.0 * 3.0;
 
     let total_store_employees: u32 = state.stores.iter().map(|s| s.employee_count).sum();
-    let admin_overhead = (total_store_employees as f64 * 0.1) * 20_000.0 * 3.0;
-    total_expenses += admin_overhead;
-
+    total_expenses += (total_store_employees as f64 * 0.1) * 20_000.0 * 3.0;
     total_expenses
 }
 
@@ -431,7 +597,6 @@ fn update_employees(state: &mut GameState, rng: &mut rand::rngs::ThreadRng) {
     let mut total_employees: u32 = state.stores.iter().map(|s| s.employee_count).sum();
     total_employees += state.executives.len() as u32;
     total_employees += (total_employees as f64 * 0.1) as u32;
-
     state.employees.total_count = total_employees;
 
     let base_salary = state.economy.minimum_wage_daily * 22.0;
@@ -441,7 +606,6 @@ fn update_employees(state: &mut GameState, rng: &mut rand::rngs::ThreadRng) {
         HrPolicy::Generous => 1.5,
         HrPolicy::Elite => 1.8,
     };
-
     let avg_salary = base_salary * salary_multiplier;
     state.employees.monthly_payroll = total_employees as f64 * avg_salary;
 
@@ -451,23 +615,22 @@ fn update_employees(state: &mut GameState, rng: &mut rand::rngs::ThreadRng) {
         HrPolicy::Generous => 72.0,
         HrPolicy::Elite => 88.0,
     };
-
     let performance_factor = if state.company.total_profit > 0.0 {
         5.0
     } else {
         -5.0
     };
     let exec_bonus = if state.is_executive_hired(ExecutivePosition::CHRO) {
-        let chro = state
+        state
             .executives
             .iter()
             .find(|e| e.position == ExecutivePosition::CHRO)
-            .unwrap();
-        chro.skill * 0.1
+            .unwrap()
+            .skill
+            * 0.1
     } else {
         0.0
     };
-
     let target_morale = (hr_morale_base + performance_factor + exec_bonus).clamp(20.0, 95.0);
     state.employees.avg_morale += (target_morale - state.employees.avg_morale) * 0.2;
     state.employees.avg_morale =
@@ -543,15 +706,16 @@ fn update_company_metrics(state: &mut GameState, rng: &mut rand::rngs::ThreadRng
 
     for store in &mut state.stores {
         if store.status == StoreStatus::Operating {
+            let upgrade_sat = get_store_satisfaction_modifier(&state.upgrades, &store.id);
             store.satisfaction =
-                (state.company.customer_satisfaction + rng.gen_range(-5.0..5.0)).clamp(20.0, 100.0);
+                (state.company.customer_satisfaction + rng.gen_range(-5.0..5.0) + upgrade_sat)
+                    .clamp(20.0, 100.0);
         }
     }
 }
 
 fn process_random_events(state: &mut GameState, rng: &mut rand::rngs::ThreadRng) -> EventImpact {
-    use super::events::generate_events;
-    let events = generate_events(state, rng);
+    let events = generate_auto_events(state, rng);
     let mut total_impact = EventImpact {
         cash_impact: 0.0,
         revenue_impact: 0.0,

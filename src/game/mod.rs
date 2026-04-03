@@ -2,6 +2,7 @@ pub mod achievements;
 pub mod board;
 pub mod campaigns;
 pub mod competitors;
+pub mod ecommerce;
 pub mod economy;
 pub mod events;
 pub mod executive_ai;
@@ -11,6 +12,7 @@ pub mod simulation;
 pub mod state;
 pub mod upgrades;
 
+pub use ecommerce::EcommerceChannel;
 pub use loyalty::LoyaltyProgram;
 pub use simulation::*;
 pub use state::*;

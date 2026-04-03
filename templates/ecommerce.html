@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1 style="font-size: 1.5rem; font-weight: 700; margin-bottom: 0.25rem;">E-commerce Channel</h1>
+<p style="color: #64748b; margin-bottom: 1rem;">Build and grow your online presence to reach digital customers. Your CTO's skill amplifies online revenue. Higher levels unlock more revenue but require more stores and investment.</p>
+
+{% if messages.len() > 0 %}
+<div style="margin-bottom: 1rem;">
+    {% for msg in messages %}
+    <div class="message msg-info">{{ msg }}</div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+    <div class="stat-card">
+        <div style="font-size: 0.75rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em;">Current Level</div>
+        <div style="font-size: 1.25rem; font-weight: 700; margin-top: 0.25rem;" class="{{ current_level_class }}">{{ current_level }}</div>
+        {% if quarters_active > 0 %}
+        <div style="font-size: 0.7rem; color: #64748b; margin-top: 0.15rem;">Active for {{ quarters_active }} quarter(s)</div>
+        {% endif %}
+    </div>
+    <div class="stat-card">
+        <div style="font-size: 0.75rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em;">Online Revenue (Last Q)</div>
+        <div style="font-size: 1.5rem; font-weight: 700; margin-top: 0.25rem; color: #22c55e;">{{ quarterly_online_revenue }}</div>
+    </div>
+    <div class="stat-card">
+        <div style="font-size: 0.75rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em;">Revenue Bonus</div>
+        <div style="font-size: 1.5rem; font-weight: 700; margin-top: 0.25rem; color: #22c55e;">{{ effective_revenue_bonus }}</div>
+    </div>
+    <div class="stat-card">
+        <div style="font-size: 0.75rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em;">Conversion Rate</div>
+        <div style="font-size: 1.5rem; font-weight: 700; margin-top: 0.25rem;">{{ conversion_rate }}</div>
+    </div>
+    <div class="stat-card">
+        <div style="font-size: 0.75rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em;">Quarterly Cost</div>
+        <div style="font-size: 1.25rem; font-weight: 700; margin-top: 0.25rem; color: #f59e0b;">{{ quarterly_cost }}</div>
+    </div>
+    <div class="stat-card">
+        <div style="font-size: 0.75rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em;">Total Online Revenue</div>
+        <div style="font-size: 1.25rem; font-weight: 700; margin-top: 0.25rem;">{{ total_online_revenue }}</div>
+    </div>
+    <div class="stat-card">
+        <div style="font-size: 0.75rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em;">CTO Skill</div>
+        <div style="font-size: 1.5rem; font-weight: 700; margin-top: 0.25rem;">{{ cto_skill }}</div>
+        <div style="font-size: 0.7rem; color: #64748b; margin-top: 0.15rem;">Boosts online revenue</div>
+    </div>
+</div>
+
+<h2 style="font-size: 1.1rem; font-weight: 600; margin-bottom: 0.75rem;">E-commerce Levels</h2>
+
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1rem;">
+    {% for level in levels %}
+    <div class="card" style="padding: 1rem; {% if level.is_current %}border-left: 4px solid #3b82f6;{% endif %}">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+            <h3 style="font-size: 1rem; font-weight: 600;" class="{{ level.color_class }}">{{ level.name }}</h3>
+            {% if level.is_current %}
+            <span style="font-size: 0.7rem; background: #3b82f6; color: white; padding: 0.15rem 0.5rem; border-radius: 0.25rem; font-weight: 600;">CURRENT</span>
+            {% endif %}
+        </div>
+        <p style="font-size: 0.8rem; color: #94a3b8; margin-bottom: 0.75rem;">{{ level.description }}</p>
+        <div style="font-size: 0.8rem; color: #64748b; margin-bottom: 0.5rem;">
+            <div>Setup Cost: <span style="color: #e2e8f0;">{{ level.setup_cost }}</span></div>
+            <div>Quarterly Cost: <span style="color: #f59e0b;">{{ level.quarterly_cost }}</span></div>
+            <div>Revenue Bonus: <span style="color: #22c55e;">{{ level.revenue_bonus }}</span></div>
+            <div>Satisfaction: <span style="color: #a78bfa;">{{ level.satisfaction_bonus }}</span></div>
+            <div>Reputation: <span style="color: #3b82f6;">{{ level.reputation_bonus }}</span></div>
+            {% if level.min_stores > 0 %}
+            <div>Min. Stores: <span style="color: #e2e8f0;">{{ level.min_stores }}</span></div>
+            {% endif %}
+        </div>
+        {% if level.can_select && !level.is_current %}
+        <form action="/ecommerce" method="POST" style="margin-top: 0.5rem;">
+            <input type="hidden" name="level" value="{{ level.key }}">
+            <button type="submit" class="btn-primary btn-sm" style="width: 100%;">{% if level.key == "none" %}Shut Down{% else %}Upgrade to {{ level.name }}{% endif %}</button>
+        </form>
+        {% else if level.show_reason %}
+        <div style="font-size: 0.75rem; color: #ef4444; margin-top: 0.5rem; text-align: center;">{{ level.reason }}</div>
+        {% endif %}
+    </div>
+    {% endfor %}
+</div>
+
+<div style="margin-top: 1.5rem; text-align: center; font-size: 0.8rem; color: #64748b;">
+    Cash on hand: <span style="color: #e2e8f0;">{{ cash }}</span>
+</div>
+
+{% endblock %}

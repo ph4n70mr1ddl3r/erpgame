@@ -17,6 +17,7 @@ A web-based business simulation game where you take on the role of CEO of Bahay 
 - **Competitors**: Compete against other home‑improvement chains (Wilcon Depot, CW Home Depot, AllHome) for market share.
 - **Loyalty Program**: Launch and manage a customer loyalty rewards program with multiple tiers (Basic, Silver, Gold, Platinum) to boost revenue, satisfaction, and repeat business.
 - **Achievements**: Unlock achievements for various milestones (store count, revenue, company value, etc.).
+- **E-commerce**: Launch and upgrade your online channel from a basic website to full omnichannel integration. Your CTO's skill amplifies online revenue.
 - **Charts & History**: View financial history and performance charts over time.
 
 ## Tech Stack
@@ -81,6 +82,7 @@ A web-based business simulation game where you take on the role of CEO of Bahay 
 │       ├── board.rs
 │       ├── competitors.rs
 │       ├── economy.rs
+│       ├── ecommerce.rs
 │       ├── events.rs
 │       ├── executive_ai.rs
 │       ├── products.rs

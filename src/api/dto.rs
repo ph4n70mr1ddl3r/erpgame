@@ -319,3 +319,27 @@ pub struct CampaignOption {
     pub reason: String,
     pub show_reason: bool,
 }
+
+#[derive(Debug, Deserialize)]
+pub struct EcommerceForm {
+    pub level: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct EcommerceLevelRow {
+    pub key: String,
+    pub name: String,
+    pub icon: String,
+    pub color_class: String,
+    pub description: String,
+    pub setup_cost: String,
+    pub quarterly_cost: String,
+    pub revenue_bonus: String,
+    pub satisfaction_bonus: String,
+    pub reputation_bonus: String,
+    pub min_stores: u32,
+    pub is_current: bool,
+    pub can_select: bool,
+    pub show_reason: bool,
+    pub reason: String,
+}

@@ -218,3 +218,22 @@ pub struct CampaignsTemplate {
     pub current_quarter: String,
     pub active_page: String,
 }
+
+#[derive(Template)]
+#[template(path = "ecommerce.html")]
+pub struct EcommerceTemplate {
+    pub current_level: String,
+    pub current_level_class: String,
+    pub quarters_active: i32,
+    pub quarterly_online_revenue: String,
+    pub total_online_revenue: String,
+    pub conversion_rate: String,
+    pub quarterly_cost: String,
+    pub effective_revenue_bonus: String,
+    pub cto_skill: String,
+    pub levels: Vec<crate::api::dto::EcommerceLevelRow>,
+    pub cash: String,
+    pub messages: Vec<String>,
+    pub current_quarter: String,
+    pub active_page: String,
+}

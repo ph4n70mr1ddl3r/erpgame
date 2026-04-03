@@ -43,6 +43,8 @@ pub struct GameState {
     pub loyalty: super::loyalty::LoyaltyProgram,
     #[serde(default)]
     pub campaigns: Vec<super::campaigns::Campaign>,
+    #[serde(default)]
+    pub ecommerce: super::ecommerce::EcommerceChannel,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -951,6 +953,7 @@ impl GameState {
             achievements: default_achievements(),
             loyalty: super::loyalty::LoyaltyProgram::new(),
             campaigns: vec![],
+            ecommerce: super::ecommerce::EcommerceChannel::new(),
         }
     }
 

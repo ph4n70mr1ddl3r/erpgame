@@ -6,6 +6,7 @@ use super::campaigns::{campaign_revenue_multiplier, process_campaigns};
 use super::competitors::{
     average_competitor_strength, update_competitors_with_actions, PlayerActions,
 };
+use super::ecommerce::process_ecommerce;
 use super::events::{generate_auto_events, generate_pending_events};
 use super::loyalty::{loyalty_revenue_multiplier, update_loyalty};
 use super::products::{
@@ -72,8 +73,11 @@ pub fn simulate_quarter(state: &mut GameState) {
     let cto_skill = find_exec_skill(state, ExecutivePosition::CTO);
 
     let total_revenue = calculate_revenue(state, &mut rng, cfo_skill, coo_skill, cmo_skill);
+    let online_revenue = state.ecommerce.quarterly_online_revenue;
+    let total_revenue = total_revenue + online_revenue;
     let total_expenses = calculate_expenses(state, operating_count, cto_skill);
     let loyalty_cost = update_loyalty(state);
+    let ecommerce_cost = process_ecommerce(state);
     let _campaign_rev_mult = process_campaigns(state);
     let loan_payments = process_loans(state);
     let event_impacts = process_random_events(state, &mut rng, total_revenue);
@@ -87,7 +91,7 @@ pub fn simulate_quarter(state: &mut GameState) {
     let board_game_over = update_board(
         &mut state.board,
         total_revenue,
-        total_expenses + hiring_costs + loyalty_cost,
+        total_expenses + hiring_costs + loyalty_cost + ecommerce_cost,
         state.company.market_share,
         operating_count,
         quarter,
@@ -97,7 +101,8 @@ pub fn simulate_quarter(state: &mut GameState) {
 
     check_achievements(state, total_revenue);
 
-    let gross_profit = total_revenue - total_expenses - hiring_costs - loyalty_cost;
+    let gross_profit =
+        total_revenue - total_expenses - hiring_costs - loyalty_cost - ecommerce_cost;
     let net_profit = gross_profit - loan_payments + event_impacts.cash_impact;
     let tax = if net_profit > 0.0 {
         net_profit * state.economy.corporate_tax_rate / 100.0
@@ -108,7 +113,7 @@ pub fn simulate_quarter(state: &mut GameState) {
 
     state.company.cash += final_profit;
     state.company.total_revenue += total_revenue;
-    state.company.total_expenses += total_expenses + hiring_costs + loyalty_cost;
+    state.company.total_expenses += total_expenses + hiring_costs + loyalty_cost + ecommerce_cost;
     state.company.total_profit += final_profit;
 
     state.company.company_value = state.company.cash

@@ -14,6 +14,7 @@ use crate::game::{
     generate_executive_name, get_available_cities, pct, simulate_quarter,
     achievements::unlocked_count, competitors::total_competitor_market_share,
     campaigns::{CampaignType, campaign_revenue_multiplier, launch_campaign},
+    ecommerce::{EcommerceLevel, upgrade_ecommerce, ecommerce_revenue_bonus},
     loyalty::{LoyaltyTier, loyalty_revenue_multiplier},
     products::invest_in_category, upgrades::purchase_upgrade as do_purchase_upgrade,
 };
@@ -881,4 +882,84 @@ pub async fn launch_campaign_route(State(state): State<AppState>, Form(form): Fo
         }
     }
     Redirect::to("/campaigns").into_response()
+}
+
+pub async fn ecommerce_page(State(state): State<AppState>) -> Response {
+    let state = state.lock().await;
+    let s = &*state;
+    let current = s.ecommerce.level;
+
+    let effective_bonus = ecommerce_revenue_bonus(s);
+    let effective_pct = format!("{:.1}%", effective_bonus * 100.0);
+
+    let cto_skill = s.executives.iter().find(|e| e.position == ExecutivePosition::CTO).map(|e| format!("{:.0}/100", e.skill)).unwrap_or_else(|| "Not hired".into());
+
+    let all_levels = EcommerceLevel::all_levels();
+
+    let levels: Vec<crate::api::dto::EcommerceLevelRow> = all_levels.iter().map(|l| {
+        let is_current = *l == current;
+        let can_afford = s.company.cash >= l.setup_cost();
+        let has_stores = s.operating_store_count() >= l.min_stores();
+        let (can_select, reason, show_reason) = if is_current {
+            (true, String::new(), false)
+        } else if !has_stores {
+            (false, format!("Need {} operating stores", l.min_stores()), true)
+        } else if !can_afford {
+            (false, format!("Need {}", format_currency(l.setup_cost())), true)
+        } else {
+            (true, String::new(), false)
+        };
+        crate::api::dto::EcommerceLevelRow {
+            key: l.key().to_string(),
+            name: l.label().to_string(),
+            icon: l.icon().to_string(),
+            color_class: l.color_class().to_string(),
+            description: l.description().to_string(),
+            setup_cost: if l.setup_cost() > 0.0 { format_currency(l.setup_cost()) } else { "Free".into() },
+            quarterly_cost: if l.quarterly_cost() > 0.0 { format_currency(l.quarterly_cost()) } else { "-".into() },
+            revenue_bonus: if l.revenue_bonus() > 0.0 { format!("+{:.0}%", l.revenue_bonus() * 100.0) } else { "-".into() },
+            satisfaction_bonus: if l.satisfaction_bonus() > 0.0 { format!("+{:.1}", l.satisfaction_bonus()) } else { "-".into() },
+            reputation_bonus: if l.reputation_bonus() > 0.0 { format!("+{:.1}", l.reputation_bonus()) } else { "-".into() },
+            min_stores: l.min_stores(),
+            is_current,
+            can_select,
+            show_reason,
+            reason,
+        }
+    }).collect();
+
+    crate::templates::EcommerceTemplate {
+        current_level: current.label().to_string(),
+        current_level_class: current.color_class().to_string(),
+        quarters_active: s.ecommerce.quarters_active,
+        quarterly_online_revenue: if s.ecommerce.quarterly_online_revenue > 0.0 { format_currency(s.ecommerce.quarterly_online_revenue) } else { "-".into() },
+        total_online_revenue: if s.ecommerce.total_online_revenue > 0.0 { format_currency(s.ecommerce.total_online_revenue) } else { "-".into() },
+        conversion_rate: if s.ecommerce.conversion_rate > 0.0 { format!("{:.1}%", s.ecommerce.conversion_rate) } else { "-".into() },
+        quarterly_cost: if current.quarterly_cost() > 0.0 { format_currency(current.quarterly_cost()) } else { "-".into() },
+        effective_revenue_bonus: effective_pct,
+        cto_skill,
+        levels,
+        cash: format_currency_full(s.company.cash),
+        messages: s.messages.clone(),
+        current_quarter: s.advance_quarter_label(),
+        active_page: "ecommerce".to_string(),
+    }.into_response()
+}
+
+pub async fn upgrade_ecommerce_route(State(state): State<AppState>, Form(form): Form<super::dto::EcommerceForm>) -> Response {
+    let mut state = state.lock().await;
+    let new_level = match EcommerceLevel::from_key(&form.level) {
+        Some(l) => l,
+        None => {
+            state.messages.push("Invalid e-commerce level.".into());
+            return Redirect::to("/ecommerce").into_response();
+        }
+    };
+    match upgrade_ecommerce(&mut state, new_level) {
+        Ok(_cost) => {}
+        Err(msg) => {
+            state.messages.push(msg.to_string());
+        }
+    }
+    Redirect::to("/ecommerce").into_response()
 }

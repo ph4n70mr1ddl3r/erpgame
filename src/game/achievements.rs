@@ -181,6 +181,22 @@ pub fn default_achievements() -> Vec<Achievement> {
             unlocked: false,
             unlocked_quarter: None,
         },
+        Achievement {
+            id: "digital_pioneer".into(),
+            title: "Digital Pioneer".into(),
+            description: "Launch the Omnichannel e-commerce platform".into(),
+            icon: "Globe".into(),
+            unlocked: false,
+            unlocked_quarter: None,
+        },
+        Achievement {
+            id: "online_mogul".into(),
+            title: "Online Mogul".into(),
+            description: "Earn P500M+ total online revenue".into(),
+            icon: "ShoppingCart".into(),
+            unlocked: false,
+            unlocked_quarter: None,
+        },
     ]
 }
 
@@ -298,6 +314,20 @@ pub fn check_achievements(state: &mut GameState, last_revenue: f64) {
         "loyalty_king",
         &q_label,
         state.loyalty.members >= 100_000,
+    );
+
+    check_one(
+        state,
+        "digital_pioneer",
+        &q_label,
+        state.ecommerce.level == super::ecommerce::EcommerceLevel::Omnichannel,
+    );
+
+    check_one(
+        state,
+        "online_mogul",
+        &q_label,
+        state.ecommerce.total_online_revenue >= 500_000_000.0,
     );
 }
 

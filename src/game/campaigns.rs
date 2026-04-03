@@ -221,8 +221,10 @@ pub fn process_campaigns(state: &mut GameState) -> f64 {
 
     for campaign in &mut state.campaigns {
         let rev = campaign.campaign_type.revenue_boost() * skill_bonus;
-        let rep = campaign.campaign_type.reputation_boost() * skill_bonus;
-        let sat = campaign.campaign_type.satisfaction_boost() * skill_bonus;
+        let remaining_ratio = campaign.quarters_remaining as f64 / campaign.quarters_total as f64;
+        let decay = 0.7 + 0.3 * remaining_ratio;
+        let rep = campaign.campaign_type.reputation_boost() * skill_bonus * decay;
+        let sat = campaign.campaign_type.satisfaction_boost() * skill_bonus * decay;
 
         total_revenue_boost += rev;
         total_reputation_boost += rep;

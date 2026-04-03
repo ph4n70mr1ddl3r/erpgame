@@ -539,7 +539,19 @@ fn calculate_expenses(state: &mut GameState, operating_count: u32, cto_skill: Op
         let quarterly_payroll = employee_count as f64 * avg_salary * 3.0;
         let utilities = store.size_sqm as f64 * 150.0 * 3.0;
         let inventory_cost = if store.status == StoreStatus::Operating {
-            store.quarterly_revenue
+            let estimated_revenue = if store.quarterly_revenue > 0.0 {
+                store.quarterly_revenue
+            } else {
+                store.size_sqm as f64
+                    * cities
+                        .iter()
+                        .find(|c| c.name == store.city)
+                        .map(|c| c.rent_per_sqm)
+                        .unwrap_or(500.0)
+                    * store.region.rent_multiplier()
+                    * 3000.0
+            };
+            estimated_revenue
                 * match state.policies.inventory {
                     InventoryPolicy::Lean => 0.35,
                     InventoryPolicy::Standard => 0.42,

@@ -835,7 +835,9 @@ pub fn format_currency_full(amount: f64) -> String {
     if !amount.is_finite() {
         return "₱0".into();
     }
-    let abs = (amount.abs()).round() as u64;
+    let rounded = amount.round();
+    let is_negative = rounded < 0.0;
+    let abs = rounded.abs() as u64;
     let s = abs.to_string();
     let chars: Vec<char> = s.chars().collect();
     let mut result = String::new();
@@ -845,7 +847,7 @@ pub fn format_currency_full(amount: f64) -> String {
         }
         result.push(*c);
     }
-    if amount < 0.0 {
+    if is_negative {
         format!("-₱{}", result)
     } else {
         format!("₱{}", result)

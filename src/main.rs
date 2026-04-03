@@ -54,6 +54,8 @@ async fn main() {
         .route("/supply-chain/warehouse", post(api::routes::upgrade_warehouse_route))
         .route("/private-label", get(api::routes::private_label_page))
         .route("/private-label/develop", post(api::routes::start_private_label))
+        .route("/seasonal", get(api::routes::seasonal_page))
+        .route("/seasonal/activate", post(api::routes::activate_seasonal_promo))
         .route("/achievements", get(api::routes::achievements_page))
         .with_state(game_state)
         .nest_service("/static", ServeDir::new("static"));

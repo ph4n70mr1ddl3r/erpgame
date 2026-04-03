@@ -13,6 +13,7 @@ use super::private_label::process_private_labels;
 use super::products::{
     total_product_margin_modifier, total_product_revenue_modifier, update_product_categories,
 };
+use super::seasonal::{process_seasonal_promotions, seasonal_revenue_multiplier};
 use super::state::*;
 use super::supply_chain::process_supply_chain;
 use super::upgrades::{
@@ -84,6 +85,7 @@ pub fn simulate_quarter(state: &mut GameState) {
     let total_expenses = calculate_expenses(state, operating_count, cto_skill);
     let loyalty_cost = update_loyalty(state);
     process_campaigns(state);
+    process_seasonal_promotions(state);
     let loan_payments = process_loans(state);
     let event_impacts = process_random_events(state, &mut rng, total_revenue);
 
@@ -430,6 +432,7 @@ fn calculate_revenue(
     let loyalty_rev_mult = loyalty_revenue_multiplier(state);
 
     let campaign_mult = campaign_revenue_multiplier(state);
+    let seasonal_mult = seasonal_revenue_multiplier(state);
 
     let skill_mult = 0.85 + (state.employees.avg_skill / 100.0) * 0.3;
 
@@ -505,6 +508,7 @@ fn calculate_revenue(
             * expansion_mult
             * loyalty_rev_mult
             * campaign_mult
+            * seasonal_mult
             * skill_mult
             * noise;
 

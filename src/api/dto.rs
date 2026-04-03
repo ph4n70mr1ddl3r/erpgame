@@ -447,3 +447,38 @@ pub struct PrivateLabelCategoryOption {
     pub reason: String,
     pub show_reason: bool,
 }
+
+#[derive(Debug, Serialize)]
+pub struct SeasonalPromoRow {
+    pub id: String,
+    pub name: String,
+    pub icon: String,
+    pub description: String,
+    pub revenue_boost: String,
+    pub reputation_boost: String,
+    pub satisfaction_boost: String,
+    pub started: String,
+    pub color_class: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct SeasonalPromoOption {
+    pub key: String,
+    pub name: String,
+    pub icon: String,
+    pub description: String,
+    pub cost: String,
+    pub quarter_label: String,
+    pub revenue_boost: String,
+    pub reputation_boost: String,
+    pub satisfaction_boost: String,
+    pub color_class: String,
+    pub can_activate: bool,
+    pub reason: String,
+    pub show_reason: bool,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct SeasonalPromoForm {
+    pub promotion_type: String,
+}

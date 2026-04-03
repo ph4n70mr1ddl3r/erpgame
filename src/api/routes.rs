@@ -18,6 +18,10 @@ use crate::game::{
     loyalty::{LoyaltyTier, loyalty_revenue_multiplier},
     private_label::{self, PrivateLabelStatus},
     products::invest_in_category, upgrades::purchase_upgrade as do_purchase_upgrade,
+    seasonal::{
+        SeasonalPromotionType, get_available_promotions_for_quarter,
+        activate_promotion, seasonal_revenue_multiplier,
+    },
     supply_chain::{
         SupplierCategory, LogisticsLevel, WarehouseTier,
         available_supplier_categories, negotiate_supplier, terminate_supplier,
@@ -1324,4 +1328,144 @@ pub async fn start_private_label(State(state): State<AppState>, Form(form): Form
         }
     }
     Redirect::to("/private-label").into_response()
+}
+
+pub async fn seasonal_page(State(state): State<AppState>) -> Response {
+    let state = state.lock().await;
+    let s = &*state;
+
+    let active_rows: Vec<super::dto::SeasonalPromoRow> = s
+        .seasonal_promotions
+        .iter()
+        .filter(|p| p.start_quarter == s.current_quarter && p.start_year == s.current_year)
+        .map(|p| {
+            let pt = p.promotion_type;
+            super::dto::SeasonalPromoRow {
+                id: p.id.clone(),
+                name: pt.label().to_string(),
+                icon: pt.icon().to_string(),
+                description: pt.description().to_string(),
+                revenue_boost: format!("+{:.0}%", pt.revenue_boost() * 100.0),
+                reputation_boost: if pt.reputation_boost() >= 0.0 {
+                    format!("+{:.1}", pt.reputation_boost())
+                } else {
+                    format!("{:.1}", pt.reputation_boost())
+                },
+                satisfaction_boost: format!("+{:.1}", pt.satisfaction_boost()),
+                started: format!("Q{} {}", p.start_quarter, p.start_year),
+                color_class: pt.color_class().to_string(),
+            }
+        })
+        .collect();
+
+    let current_quarter_active_count = s
+        .seasonal_promotions
+        .iter()
+        .filter(|p| p.start_quarter == s.current_quarter && p.start_year == s.current_year)
+        .count();
+
+    let active_type_keys: std::collections::HashSet<String> = s
+        .seasonal_promotions
+        .iter()
+        .filter(|p| p.start_quarter == s.current_quarter && p.start_year == s.current_year)
+        .map(|p| p.promotion_type.key().to_string())
+        .collect();
+
+    let available = get_available_promotions_for_quarter(s.current_quarter);
+    let can_activate_more = current_quarter_active_count < 2;
+
+    let options: Vec<super::dto::SeasonalPromoOption> = available
+        .iter()
+        .map(|pt| {
+            let already_active = active_type_keys.contains(pt.key());
+            let can_afford = s.company.cash >= pt.base_cost();
+            let (can_activate, reason, show_reason) = if already_active {
+                (false, "Already active".into(), true)
+            } else if !can_activate_more {
+                (false, "Max 2 promotions per quarter".into(), true)
+            } else if !can_afford {
+                (false, format!("Need {}", format_currency(pt.base_cost())), true)
+            } else {
+                (true, String::new(), false)
+            };
+            super::dto::SeasonalPromoOption {
+                key: pt.key().to_string(),
+                name: pt.label().to_string(),
+                icon: pt.icon().to_string(),
+                description: pt.description().to_string(),
+                cost: format_currency(pt.base_cost()),
+                quarter_label: pt.quarter_label().to_string(),
+                revenue_boost: format!("+{:.0}%", pt.revenue_boost() * 100.0),
+                reputation_boost: if pt.reputation_boost() >= 0.0 {
+                    format!("+{:.1}", pt.reputation_boost())
+                } else {
+                    format!("{:.1}", pt.reputation_boost())
+                },
+                satisfaction_boost: format!("+{:.1}", pt.satisfaction_boost()),
+                color_class: pt.color_class().to_string(),
+                can_activate,
+                reason,
+                show_reason,
+            }
+        })
+        .collect();
+
+    let effective_mult = seasonal_revenue_multiplier(s);
+    let effective_pct = format!("{:.1}%", (effective_mult - 1.0) * 100.0);
+
+    let cmo_skill = s
+        .executives
+        .iter()
+        .find(|e| e.position == ExecutivePosition::CMO)
+        .map(|e| format!("{:.0}/100", e.skill))
+        .unwrap_or_else(|| "Not hired".into());
+
+    let quarter_name = match s.current_quarter {
+        1 => "Q1 - First Quarter",
+        2 => "Q2 - Second Quarter",
+        3 => "Q3 - Third Quarter",
+        4 => "Q4 - Fourth Quarter",
+        _ => "Unknown",
+    };
+
+    crate::templates::SeasonalTemplate {
+        active_promotions: active_rows,
+        available_options: options,
+        current_quarter_label: quarter_name.to_string(),
+        active_count: current_quarter_active_count,
+        effective_revenue_bonus: effective_pct,
+        cmo_skill,
+        cash: format_currency_full(s.company.cash),
+        messages: s.messages_vec(),
+        current_quarter: s.current_quarter_label(),
+        active_page: "seasonal".to_string(),
+    }
+    .into_response()
+}
+
+pub async fn activate_seasonal_promo(
+    State(state): State<AppState>,
+    Form(form): Form<super::dto::SeasonalPromoForm>,
+) -> Response {
+    let mut state = state.lock().await;
+    let promo_type = match SeasonalPromotionType::from_key(&form.promotion_type) {
+        Some(pt) => pt,
+        None => {
+            state.push_message("Invalid seasonal promotion type.".into());
+            return Redirect::to("/seasonal").into_response();
+        }
+    };
+    match activate_promotion(&mut state, promo_type) {
+        Ok(cost) => {
+            state.push_message(format!(
+                "Activated '{}' seasonal promotion for {}. It will boost revenue for this quarter.",
+                promo_type.label(),
+                format_currency(cost),
+            ));
+        }
+        Err(msg) => {
+            state.push_message(msg.to_string());
+        }
+    }
+    Redirect::to("/seasonal").into_response()
 }

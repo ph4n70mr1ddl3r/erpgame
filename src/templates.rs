@@ -279,3 +279,18 @@ pub struct PrivateLabelTemplate {
     pub current_quarter: String,
     pub active_page: String,
 }
+
+#[derive(Template)]
+#[template(path = "seasonal.html")]
+pub struct SeasonalTemplate {
+    pub active_promotions: Vec<crate::api::dto::SeasonalPromoRow>,
+    pub available_options: Vec<crate::api::dto::SeasonalPromoOption>,
+    pub current_quarter_label: String,
+    pub active_count: usize,
+    pub effective_revenue_bonus: String,
+    pub cmo_skill: String,
+    pub cash: String,
+    pub messages: Vec<String>,
+    pub current_quarter: String,
+    pub active_page: String,
+}

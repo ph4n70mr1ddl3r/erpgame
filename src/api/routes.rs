@@ -121,7 +121,7 @@ pub async fn open_store(State(state): State<AppState>, Form(form): Form<NewStore
     let cost = store_type.opening_cost();
     let current_cash = state.company.cash;
     if current_cash < cost {
-        state.messages.push(format!("Cannot open store: need {} but only have {}", format_currency(cost), format_currency(current_cash)));
+            state.push_message(format!("Cannot open store: need {} but only have {}", format_currency(cost), format_currency(current_cash)));
         return Redirect::to("/stores").into_response();
     }
     let cities = get_available_cities();
@@ -134,7 +134,7 @@ pub async fn open_store(State(state): State<AppState>, Form(form): Form<NewStore
         quarterly_expenses: 0.0, customer_count: 0, employee_count: 0, satisfaction: 50.0, age_quarters: 0,
         construction_quarters_left: store_type.construction_quarters(), opened_quarter: 0, opened_year: 0,
     };
-    state.messages.push(format!("Breaking ground on {} in {} (Cost: {}, Opens in {} quarters)", store.name, store.city, format_currency(cost), store.construction_quarters_left));
+    state.push_message(format!("Breaking ground on {} in {} (Cost: {}, Opens in {} quarters)", store.name, store.city, format_currency(cost), store.construction_quarters_left));
     state.stores.push(store);
     Redirect::to("/stores").into_response()
 }
@@ -144,11 +144,11 @@ pub async fn close_store(State(state): State<AppState>, Path(id): Path<String>) 
     let operating_count = state.stores.iter().filter(|s| s.status == StoreStatus::Operating).count();
     if let Some(idx) = state.stores.iter().position(|s| s.id == id) {
         if state.stores[idx].status != StoreStatus::Operating {
-            state.messages.push("Store is not operating.".into());
+            state.push_message("Store is not operating.".into());
             return Redirect::to("/stores").into_response();
         }
         if operating_count <= 1 {
-            state.messages.push("Cannot close your last operating store.".into());
+            state.push_message("Cannot close your last operating store.".into());
             return Redirect::to("/stores").into_response();
         }
         let sell_value = state.stores[idx].store_type.opening_cost() * 0.4;
@@ -156,9 +156,9 @@ pub async fn close_store(State(state): State<AppState>, Path(id): Path<String>) 
         let store_city = state.stores[idx].city.clone();
         state.stores[idx].status = StoreStatus::Closed;
         state.company.cash += sell_value;
-        state.messages.push(format!("Closed {} in {}. Received {} from asset sale.", store_name, store_city, format_currency(sell_value)));
+        state.push_message(format!("Closed {} in {}. Received {} from asset sale.", store_name, store_city, format_currency(sell_value)));
     } else {
-        state.messages.push("Store not found.".into());
+        state.push_message("Store not found.".into());
     }
     Redirect::to("/stores").into_response()
 }
@@ -194,7 +194,7 @@ pub async fn hire_executive(State(state): State<AppState>, Form(form): Form<Hire
         _ => return Redirect::to("/executives").into_response(),
     };
     if state.is_executive_hired(position) {
-        state.messages.push(format!("{} position is already filled.", position.short_title()));
+        state.push_message(format!("{} position is already filled.", position.short_title()));
         return Redirect::to("/executives").into_response();
     }
     let mut rng = rand::thread_rng();
@@ -203,7 +203,7 @@ pub async fn hire_executive(State(state): State<AppState>, Form(form): Form<Hire
     let (min_sal, max_sal) = position.salary_range();
     let salary = rng.gen_range(min_sal..max_sal);
     let hiring_bonus = salary * 3.0;
-    if state.company.cash < hiring_bonus { state.messages.push(format!("Cannot afford hiring bonus for {} ({})", position.short_title(), format_currency(hiring_bonus))); return Redirect::to("/executives").into_response(); }
+    if state.company.cash < hiring_bonus { state.push_message(format!("Cannot afford hiring bonus for {} ({})", position.short_title(), format_currency(hiring_bonus))); return Redirect::to("/executives").into_response(); }
     state.company.cash -= hiring_bonus;
     let exec = Executive {
         id: uuid::Uuid::new_v4().to_string(),
@@ -217,7 +217,7 @@ pub async fn hire_executive(State(state): State<AppState>, Form(form): Form<Hire
         performance_rating: rng.gen_range(50.0..80.0),
         recommendation: None,
     };
-    state.messages.push(format!(
+    state.push_message(format!(
         "Hired {} as {} (Skill: {:.0}/100, Salary: {}/mo, Hiring Bonus: {})",
         exec.name,
         exec.position.short_title(),
@@ -237,7 +237,7 @@ pub async fn fire_executive(State(state): State<AppState>, Path(id): Path<String
         let severance = state.executives[idx].salary_monthly * 6.0;
         if state.company.cash < severance {
             let cur = format_currency(state.company.cash);
-            state.messages.push(format!(
+            state.push_message(format!(
                 "Cannot afford {} severance for {} ({}).",
                 format_currency(severance),
                 exec_name,
@@ -247,7 +247,7 @@ pub async fn fire_executive(State(state): State<AppState>, Path(id): Path<String
         }
         state.executives.remove(idx);
         state.company.cash -= severance;
-        state.messages.push(format!("Fired {} ({}). Paid {} severance.", exec_name, exec_pos, format_currency(severance)));
+        state.push_message(format!("Fired {} ({}). Paid {} severance.", exec_name, exec_pos, format_currency(severance)));
     }
     Redirect::to("/executives").into_response()
 }
@@ -275,7 +275,7 @@ pub async fn update_policies(State(state): State<AppState>, Form(form): Form<Pol
     state.policies.customer_service = match form.customer_service.as_str() { "basic" => CustomerServicePolicy::Basic, "excellent" => CustomerServicePolicy::Excellent, "whiteglove" => CustomerServicePolicy::WhiteGlove, _ => CustomerServicePolicy::Good };
     state.policies.marketing = match form.marketing.as_str() { "lowkey" => MarketingPolicy::LowKey, "heavy" => MarketingPolicy::Heavy, "aggressive" => MarketingPolicy::Aggressive, _ => MarketingPolicy::Moderate };
     state.policies.inventory = match form.inventory.as_str() { "lean" => InventoryPolicy::Lean, "buffered" => InventoryPolicy::Buffered, "abundant" => InventoryPolicy::Abundant, _ => InventoryPolicy::Standard };
-    state.messages.push("Company policies updated.".into());
+    state.push_message("Company policies updated.".into());
     Redirect::to("/policies").into_response()
 }
 
@@ -324,13 +324,13 @@ pub async fn take_loan(State(state): State<AppState>, Form(form): Form<LoanForm>
     let amount: f64 = form.amount.parse().unwrap_or(0.0);
     let quarters: i32 = form.quarters.parse().unwrap_or(8);
     if !amount.is_finite() || amount < crate::game::state::MINIMUM_LOAN_AMOUNT || !quarters.is_positive() {
-        state.messages.push(format!("Invalid loan parameters. Minimum loan is {}.", format_currency(crate::game::state::MINIMUM_LOAN_AMOUNT)));
+        state.push_message(format!("Invalid loan parameters. Minimum loan is {}.", format_currency(crate::game::state::MINIMUM_LOAN_AMOUNT)));
         return Redirect::to("/finances").into_response();
     }
     let total_outstanding: f64 = state.company.loans.iter().map(|l| l.remaining).sum();
     let max_loan = (state.company.company_value * 0.5).max(crate::game::state::MINIMUM_LOAN_AMOUNT);
     if total_outstanding + amount > max_loan {
-        state.messages.push(format!("Total debt ({} + new {}) would exceed maximum of {}.", format_currency(total_outstanding), format_currency(amount), format_currency(max_loan)));
+        state.push_message(format!("Total debt ({} + new {}) would exceed maximum of {}.", format_currency(total_outstanding), format_currency(amount), format_currency(max_loan)));
         return Redirect::to("/finances").into_response();
     }
     let rate = state.economy.interest_rate + 1.5;
@@ -340,7 +340,7 @@ pub async fn take_loan(State(state): State<AppState>, Form(form): Form<LoanForm>
     state.company.cash += amount;
     state.company.has_ever_had_loan = true;
     state.company.loans.push(loan);
-    state.messages.push(format!("Took a loan of {} at {} APR over {} quarters. Quarterly payment: {}", format_currency(amount), pct(rate), quarters, format_currency(quarterly_payment)));
+    state.push_message(format!("Took a loan of {} at {} APR over {} quarters. Quarterly payment: {}", format_currency(amount), pct(rate), quarters, format_currency(quarterly_payment)));
     Redirect::to("/finances").into_response()
 }
 
@@ -391,7 +391,7 @@ pub async fn resolve_decision(State(state): State<AppState>, Form(form): Form<Re
     let mut state = state.lock().await;
     let found = state.resolve_pending_event(&form.event_id, &form.choice_id);
     if found.is_none() {
-        state.messages.push("Event not found or already resolved.".into());
+        state.push_message("Event not found or already resolved.".into());
     }
     if state.has_pending_events() {
         Redirect::to("/decisions").into_response()
@@ -439,7 +439,7 @@ pub async fn update_delegation(State(state): State<AppState>, Form(form): Form<D
     for (cat, val) in pairs {
         state.delegation.set(cat, val.is_some());
     }
-    state.messages.push("Delegation settings updated.".into());
+    state.push_message("Delegation settings updated.".into());
     Redirect::to("/delegation").into_response()
 }
 
@@ -531,19 +531,19 @@ pub async fn invest_product(State(state): State<AppState>, Form(form): Form<supe
     let mut state = state.lock().await;
     let amount: f64 = form.amount.parse().unwrap_or(0.0);
     if !amount.is_finite() || amount < 500_000.0 {
-        state.messages.push("Minimum investment is P500K.".into());
+        state.push_message("Minimum investment is P500K.".into());
         return Redirect::to("/products").into_response();
     }
     if state.company.cash < amount {
-        state.messages.push(format!("Cannot afford {} investment.", format_currency(amount)));
+        state.push_message(format!("Cannot afford {} investment.", format_currency(amount)));
         return Redirect::to("/products").into_response();
     }
     let increase = invest_in_category(&mut state.products, &form.category_id, amount);
     if increase > 0.0 {
         state.company.cash -= amount;
-        state.messages.push(format!("Invested {} in product category. Investment increased by {:.1}%.", format_currency(amount), increase));
+        state.push_message(format!("Invested {} in product category. Investment increased by {:.1}%.", format_currency(amount), increase));
     } else {
-        state.messages.push("Category not found.".into());
+        state.push_message("Category not found.".into());
     }
     Redirect::to("/products").into_response()
 }
@@ -586,21 +586,21 @@ pub async fn purchase_upgrade(State(state): State<AppState>, Form(form): Form<su
     let mut state = state.lock().await;
     let upgrade_type = match UpgradeType::from_key(&form.upgrade_type) {
         Some(ut) => ut,
-        None => { state.messages.push("Invalid upgrade type.".into()); return Redirect::to("/upgrades").into_response(); }
+        None => { state.push_message("Invalid upgrade type.".into()); return Redirect::to("/upgrades").into_response(); }
     };
     let cost = upgrade_type.cost_per_level();
     if state.company.cash < cost {
-        state.messages.push(format!("Cannot afford upgrade (need {}).", format_currency(cost)));
+        state.push_message(format!("Cannot afford upgrade (need {}).", format_currency(cost)));
         return Redirect::to("/upgrades").into_response();
     }
     match do_purchase_upgrade(&mut state.upgrades, &form.store_id, upgrade_type) {
         Ok(cost) => {
             state.company.cash -= cost;
             let store_name = state.stores.iter().find(|s| s.id == form.store_id).map(|s| s.name.clone()).unwrap_or_else(|| "Unknown".into());
-            state.messages.push(format!("Upgraded {} at {} for {}.", upgrade_type.label(), store_name, format_currency(cost)));
+            state.push_message(format!("Upgraded {} at {} for {}.", upgrade_type.label(), store_name, format_currency(cost)));
         }
         Err(msg) => {
-            state.messages.push(msg.to_string());
+            state.push_message(msg.to_string());
         }
     }
     Redirect::to("/upgrades").into_response()
@@ -703,13 +703,7 @@ pub async fn loyalty_page(State(state): State<AppState>) -> Response {
         crate::api::dto::LoyaltyTierRow {
             key: t.key().to_string(),
             name: t.label().to_string(),
-            icon_char: match t {
-                LoyaltyTier::None => "X".into(),
-                LoyaltyTier::Basic => "Star".into(),
-                LoyaltyTier::Silver => "Award".into(),
-                LoyaltyTier::Gold => "Crown".into(),
-                LoyaltyTier::Platinum => "Gem".into(),
-            },
+            icon_char: t.icon().into(),
             color_class: t.color_class().to_string(),
             description: t.description().to_string(),
             setup_cost: if t.setup_cost() > 0.0 { format_currency(t.setup_cost()) } else { "Free".into() },
@@ -753,7 +747,7 @@ pub async fn update_loyalty(State(state): State<AppState>, Form(form): Form<supe
     let new_tier = match LoyaltyTier::from_key(&form.tier) {
         Some(t) => t,
         None => {
-            state.messages.push("Invalid loyalty tier.".into());
+            state.push_message("Invalid loyalty tier.".into());
             return Redirect::to("/loyalty").into_response();
         }
     };
@@ -764,7 +758,7 @@ pub async fn update_loyalty(State(state): State<AppState>, Form(form): Form<supe
 
     let setup_cost = new_tier.setup_cost();
     if state.company.cash < setup_cost {
-        state.messages.push(format!(
+        state.push_message(format!(
             "Cannot afford {} loyalty program setup (need {})",
             new_tier.label(),
             format_currency(setup_cost)
@@ -778,9 +772,9 @@ pub async fn update_loyalty(State(state): State<AppState>, Form(form): Form<supe
     state.loyalty.quarters_active = 0;
 
     if new_tier == LoyaltyTier::None {
-        state.messages.push("Loyalty program discontinued. Members will be notified.".into());
+        state.push_message("Loyalty program discontinued. Members will be notified.".into());
     } else {
-        state.messages.push(format!(
+        state.push_message(format!(
             "Launched {} Loyalty Program! Setup cost: {}. Members will start enrolling next quarter.",
             new_tier.label(),
             format_currency(setup_cost)
@@ -864,13 +858,13 @@ pub async fn launch_campaign_route(State(state): State<AppState>, Form(form): Fo
     let campaign_type = match CampaignType::from_key(&form.campaign_type) {
         Some(ct) => ct,
         None => {
-            state.messages.push("Invalid campaign type.".into());
+            state.push_message("Invalid campaign type.".into());
             return Redirect::to("/campaigns").into_response();
         }
     };
     match launch_campaign(&mut state, campaign_type) {
         Ok(cost) => {
-            state.messages.push(format!(
+            state.push_message(format!(
                 "Launched '{}' campaign for {}. It will run for {} quarter(s).",
                 campaign_type.label(),
                 format_currency(cost),
@@ -878,7 +872,7 @@ pub async fn launch_campaign_route(State(state): State<AppState>, Form(form): Fo
             ));
         }
         Err(msg) => {
-            state.messages.push(msg.to_string());
+            state.push_message(msg.to_string());
         }
     }
     Redirect::to("/campaigns").into_response()
@@ -951,14 +945,14 @@ pub async fn upgrade_ecommerce_route(State(state): State<AppState>, Form(form): 
     let new_level = match EcommerceLevel::from_key(&form.level) {
         Some(l) => l,
         None => {
-            state.messages.push("Invalid e-commerce level.".into());
+            state.push_message("Invalid e-commerce level.".into());
             return Redirect::to("/ecommerce").into_response();
         }
     };
     match upgrade_ecommerce(&mut state, new_level) {
         Ok(_cost) => {}
         Err(msg) => {
-            state.messages.push(msg.to_string());
+            state.push_message(msg.to_string());
         }
     }
     Redirect::to("/ecommerce").into_response()

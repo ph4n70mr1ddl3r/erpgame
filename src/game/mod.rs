@@ -12,8 +12,6 @@ pub mod simulation;
 pub mod state;
 pub mod upgrades;
 
-pub use ecommerce::EcommerceChannel;
-pub use loyalty::LoyaltyProgram;
 pub use simulation::*;
 pub use state::*;
 pub use upgrades::UpgradeType;

@@ -981,6 +981,13 @@ impl GameState {
         }
     }
 
+    pub fn push_message(&mut self, msg: String) {
+        self.messages.push(msg);
+        while self.messages.len() > MAX_MESSAGES {
+            self.messages.remove(0);
+        }
+    }
+
     pub fn has_pending_events(&self) -> bool {
         !self.pending_events.is_empty()
     }

@@ -204,11 +204,9 @@ pub fn upgrade_ecommerce(
     if new_level == EcommerceLevel::None {
         state.ecommerce.quarterly_online_revenue = 0.0;
         state.ecommerce.conversion_rate = 0.0;
-        state
-            .messages
-            .push("E-commerce channel shut down. Online presence discontinued.".into());
+        state.push_message("E-commerce channel shut down. Online presence discontinued.".into());
     } else {
-        state.messages.push(format!(
+        state.push_message(format!(
             "Launched {} e-commerce channel for {}! Online sales will begin next quarter.",
             new_level.label(),
             super::state::format_currency(cost)

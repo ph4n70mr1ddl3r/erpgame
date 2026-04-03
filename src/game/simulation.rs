@@ -148,7 +148,7 @@ pub fn simulate_quarter(state: &mut GameState) {
 
     if state.company.cash < super::state::BANKRUPTCY_THRESHOLD {
         state.game_over = true;
-        state.messages.push(
+        state.push_message(
             "GAME OVER: Your company has gone bankrupt! The board of directors has seized control."
                 .into(),
         );
@@ -160,7 +160,7 @@ pub fn simulate_quarter(state: &mut GameState) {
 
     if state.company.company_value >= super::state::WINNING_VALUE {
         state.game_over = true;
-        state.messages.push(
+        state.push_message(
             "CONGRATULATIONS: Bahay Depot has become a P10B+ company! You are a legendary CEO!"
                 .into(),
         );
@@ -173,11 +173,7 @@ pub fn simulate_quarter(state: &mut GameState) {
         format_currency(final_profit), format_currency(state.company.cash),
         state.decisions_made, state.decisions_delegated,
     );
-    state.messages.push(summary);
-
-    while state.messages.len() > super::state::MAX_MESSAGES {
-        state.messages.remove(0);
-    }
+    state.push_message(summary);
 }
 
 fn process_pending_event_generation(state: &mut GameState, rng: &mut rand::rngs::ThreadRng) {
@@ -241,7 +237,7 @@ fn auto_resolve_event(
         year: event.year,
     });
 
-    state.messages.push(format!(
+    state.push_message(format!(
         "{} decision on '{}': {}",
         description_prefix, event.title, choice.label
     ));
@@ -618,7 +614,7 @@ fn process_loans(state: &mut GameState) -> f64 {
         loan.quarters_remaining -= 1;
         if loan.quarters_remaining <= 0 || loan.remaining <= 0.0 {
             state.company.loans.remove(i);
-            state.messages.push("A loan has been fully repaid.".into());
+            state.push_message("A loan has been fully repaid.".into());
         } else {
             i += 1;
         }
@@ -814,7 +810,7 @@ fn process_random_events(
 
     for event in events {
         state.log_event(event.clone());
-        state.messages.push(format!("[EVENT] {}", event.title));
+        state.push_message(format!("[EVENT] {}", event.title));
         total_impact.cash_impact += event.impact.cash_impact;
         total_impact.cash_impact += event.impact.revenue_impact * total_revenue;
         total_impact.cash_impact -= event.impact.expense_impact;

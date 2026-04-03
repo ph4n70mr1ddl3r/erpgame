@@ -180,7 +180,7 @@ pub fn update_loyalty(state: &mut GameState) -> f64 {
         .saturating_sub(churn)
         .saturating_add(new_members);
 
-    let member_cap = operating_count as u32 * 15_000;
+    let member_cap = operating_count * 15_000;
     program.members = program.members.min(member_cap);
 
     let cost = program.tier.quarterly_cost_per_store() * operating_count as f64;

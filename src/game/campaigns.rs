@@ -246,9 +246,7 @@ pub fn process_campaigns(state: &mut GameState) -> f64 {
     state.campaigns.retain(|c| c.quarters_remaining > 0);
 
     for name in &expired {
-        state
-            .messages
-            .push(format!("Marketing campaign '{}' has ended.", name));
+        state.push_message(format!("Marketing campaign '{}' has ended.", name));
     }
 
     total_revenue_boost

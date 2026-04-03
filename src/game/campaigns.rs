@@ -205,7 +205,7 @@ pub fn launch_campaign(
     Ok(cost)
 }
 
-pub fn process_campaigns(state: &mut GameState) -> f64 {
+pub fn process_campaigns(state: &mut GameState) {
     let cmo_skill = state
         .executives
         .iter()
@@ -215,18 +215,15 @@ pub fn process_campaigns(state: &mut GameState) -> f64 {
 
     let skill_bonus = 1.0 + cmo_skill * 0.005;
 
-    let mut total_revenue_boost = 0.0;
     let mut total_reputation_boost = 0.0;
     let mut total_satisfaction_boost = 0.0;
 
     for campaign in &mut state.campaigns {
-        let rev = campaign.campaign_type.revenue_boost() * skill_bonus;
         let remaining_ratio = campaign.quarters_remaining as f64 / campaign.quarters_total as f64;
         let decay = 0.7 + 0.3 * remaining_ratio;
         let rep = campaign.campaign_type.reputation_boost() * skill_bonus * decay;
         let sat = campaign.campaign_type.satisfaction_boost() * skill_bonus * decay;
 
-        total_revenue_boost += rev;
         total_reputation_boost += rep;
         total_satisfaction_boost += sat;
 
@@ -250,8 +247,6 @@ pub fn process_campaigns(state: &mut GameState) -> f64 {
     for name in &expired {
         state.push_message(format!("Marketing campaign '{}' has ended.", name));
     }
-
-    total_revenue_boost
 }
 
 pub fn campaign_revenue_multiplier(state: &GameState) -> f64 {

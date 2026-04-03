@@ -1,7 +1,7 @@
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 
-use super::state::{ExpansionPolicy, MarketingPolicy, PricingPolicy};
+use super::state::{ExpansionPolicy, PricingPolicy};
 use std::collections::VecDeque;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -53,11 +53,7 @@ pub fn default_competitors() -> Vec<Competitor> {
 
 pub struct PlayerActions {
     pub player_market_share: f64,
-    #[allow(dead_code)]
-    pub player_store_count: u32,
     pub player_pricing: PricingPolicy,
-    #[allow(dead_code)]
-    pub player_marketing: MarketingPolicy,
     pub player_expansion: ExpansionPolicy,
     pub opened_new_store: bool,
 }

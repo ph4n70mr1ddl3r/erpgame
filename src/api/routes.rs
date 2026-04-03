@@ -255,8 +255,14 @@ pub async fn fire_executive(State(state): State<AppState>, Path(id): Path<String
             ));
             return Redirect::to("/executives").into_response();
         }
+        let exec_position = state.executives[idx].position;
         state.executives.remove(idx);
         state.company.cash -= severance;
+        for cat in EventCategory::all_categories() {
+            if cat.delegate_position() == exec_position && state.delegation.is_delegated(cat) {
+                state.delegation.set(cat, false);
+            }
+        }
         state.push_message(format!("Fired {} ({}). Paid {} severance.", exec_name, exec_pos, format_currency(severance)));
     } else {
         state.push_message("Executive not found.".into());
@@ -335,7 +341,7 @@ pub async fn take_loan(State(state): State<AppState>, Form(form): Form<LoanForm>
     let mut state = state.lock().await;
     let amount: f64 = form.amount.parse().unwrap_or(0.0);
     let quarters: i32 = form.quarters.parse().unwrap_or(8);
-    if !amount.is_finite() || amount < crate::game::state::MINIMUM_LOAN_AMOUNT || !quarters.is_positive() {
+    if !amount.is_finite() || amount < crate::game::state::MINIMUM_LOAN_AMOUNT || !quarters.is_positive() || quarters > 40 {
         state.push_message(format!("Invalid loan parameters. Minimum loan is {}.", format_currency(crate::game::state::MINIMUM_LOAN_AMOUNT)));
         return Redirect::to("/finances").into_response();
     }
@@ -474,24 +480,11 @@ fn rating_class(value: f64, mid: f64) -> String {
     if value >= mid + 10.0 { "text-green-400".to_string() } else if value >= mid { "text-yellow-400".to_string() } else { "text-red-400".to_string() }
 }
 
-fn threshold_color(value: f64, good_threshold: f64, warn_threshold: f64, higher_is_good: bool) -> String {
-    let (good, warn) = if higher_is_good {
-        (value > good_threshold, value > warn_threshold)
-    } else {
-        (value < good_threshold, value < warn_threshold)
-    };
-    if good { "#22c55e".to_string() } else if warn { "#f59e0b".to_string() } else { "#ef4444".to_string() }
-}
-
 fn patience_color(value: f64) -> String {
     if value > 70.0 { "#22c55e".to_string() }
     else if value > 50.0 { "#f59e0b".to_string() }
     else if value > 30.0 { "#f97316".to_string() }
     else { "#ef4444".to_string() }
-}
-
-fn pressure_color(value: f64) -> String {
-    threshold_color(value, 30.0, 60.0, false)
 }
 
 fn build_chart_data(s: &GameState) -> crate::api::dto::ChartData {
@@ -552,12 +545,22 @@ pub async fn invest_product(State(state): State<AppState>, Form(form): Form<supe
         state.push_message(format!("Cannot afford {} investment.", format_currency(amount)));
         return Redirect::to("/products").into_response();
     }
-    let increase = invest_in_category(&mut state.products, &form.category_id, amount);
-    if increase > 0.0 {
-        state.company.cash -= amount;
-        state.push_message(format!("Invested {} in product category. Investment increased by {:.1}%.", format_currency(amount), increase));
+    let (increase, actual_cost) = invest_in_category(&mut state.products, &form.category_id, amount);
+    if actual_cost > 0.0 {
+        state.company.cash -= actual_cost;
+        if increase < (amount / 500_000.0).min(5.0) {
+            state.push_message(format!(
+                "Invested {} in product category. Investment increased by {:.1}% (capped at 100%).",
+                format_currency(actual_cost), increase
+            ));
+        } else {
+            state.push_message(format!(
+                "Invested {} in product category. Investment increased by {:.1}%.",
+                format_currency(actual_cost), increase
+            ));
+        }
     } else {
-        state.push_message("Category not found.".into());
+        state.push_message("Category not found or already at maximum investment.".into());
     }
     Redirect::to("/products").into_response()
 }
@@ -607,6 +610,10 @@ pub async fn purchase_upgrade(State(state): State<AppState>, Form(form): Form<su
         state.push_message(format!("Cannot afford upgrade (need {}).", format_currency(cost)));
         return Redirect::to("/upgrades").into_response();
     }
+    if !state.stores.iter().any(|s| s.id == form.store_id) {
+        state.push_message("Invalid store selected.".into());
+        return Redirect::to("/upgrades").into_response();
+    }
     match do_purchase_upgrade(&mut state.upgrades, &form.store_id, upgrade_type) {
         Ok(cost) => {
             state.company.cash -= cost;
@@ -630,7 +637,7 @@ pub async fn board_page(State(state): State<AppState>) -> Response {
             patience: format!("{:.0}%", b.patience), patience_class: b.patience_class().to_string(),
             patience_color: patience_color(b.patience),
             pressure: format!("{:.0}%", b.pressure_level), pressure_class: b.pressure_class().to_string(),
-            pressure_color: pressure_color(b.pressure_level),
+            pressure_color: String::new(),
             warnings: b.warnings, description: b.description(),
             last_review: if b.last_review_year > 0 { format!("Q{} {}", b.last_review_quarter, b.last_review_year) } else { "None yet".into() },
             quarters_until_review: quarters_until,
@@ -767,6 +774,23 @@ pub async fn update_loyalty(State(state): State<AppState>, Form(form): Form<supe
     };
 
     if new_tier == state.loyalty.tier {
+        return Redirect::to("/loyalty").into_response();
+    }
+
+    let allowed_tier = if new_tier == LoyaltyTier::None {
+        true
+    } else {
+        let next_tier = match state.loyalty.tier {
+            LoyaltyTier::None => Some(LoyaltyTier::Basic),
+            LoyaltyTier::Basic => Some(LoyaltyTier::Silver),
+            LoyaltyTier::Silver => Some(LoyaltyTier::Gold),
+            LoyaltyTier::Gold => Some(LoyaltyTier::Platinum),
+            LoyaltyTier::Platinum => None,
+        };
+        next_tier == Some(new_tier)
+    };
+    if !allowed_tier {
+        state.push_message("You can only upgrade one loyalty tier at a time.".into());
         return Redirect::to("/loyalty").into_response();
     }
 

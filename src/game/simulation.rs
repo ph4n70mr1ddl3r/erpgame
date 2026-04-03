@@ -51,9 +51,7 @@ pub fn simulate_quarter(state: &mut GameState) {
 
     let player_actions = PlayerActions {
         player_market_share: state.company.market_share,
-        player_store_count: state.operating_store_count(),
         player_pricing: state.policies.pricing,
-        player_marketing: state.policies.marketing,
         player_expansion: state.policies.expansion,
         opened_new_store: state
             .stores
@@ -80,7 +78,7 @@ pub fn simulate_quarter(state: &mut GameState) {
     let total_revenue = total_revenue + online_revenue;
     let total_expenses = calculate_expenses(state, operating_count, cto_skill);
     let loyalty_cost = update_loyalty(state);
-    let _ = process_campaigns(state);
+    process_campaigns(state);
     let loan_payments = process_loans(state);
     let event_impacts = process_random_events(state, &mut rng, total_revenue);
 
@@ -90,10 +88,11 @@ pub fn simulate_quarter(state: &mut GameState) {
     update_company_metrics(state, &mut rng);
 
     let operating_count = state.operating_store_count();
+    let all_expenses = total_expenses + hiring_costs + loyalty_cost + ecommerce_cost;
     let board_game_over = update_board(
         &mut state.board,
         total_revenue,
-        total_expenses + hiring_costs + loyalty_cost + ecommerce_cost,
+        all_expenses,
         state.company.market_share,
         operating_count,
         quarter,
@@ -101,8 +100,7 @@ pub fn simulate_quarter(state: &mut GameState) {
         &mut state.messages,
     );
 
-    let gross_profit =
-        total_revenue - total_expenses - hiring_costs - loyalty_cost - ecommerce_cost;
+    let gross_profit = total_revenue - all_expenses;
     let net_profit = gross_profit - loan_payments + event_impacts.cash_impact;
     let tax = if net_profit > 0.0 {
         net_profit * state.economy.corporate_tax_rate / 100.0
@@ -113,9 +111,10 @@ pub fn simulate_quarter(state: &mut GameState) {
 
     state.company.cash += final_profit;
     state.company.total_revenue += total_revenue;
-    state.company.total_expenses += total_expenses + hiring_costs + loyalty_cost + ecommerce_cost;
+    state.company.total_expenses += all_expenses;
     state.company.total_profit += final_profit;
 
+    let total_debt: f64 = state.company.loans.iter().map(|l| l.remaining).sum();
     state.company.company_value = state.company.cash
         + state
             .stores
@@ -127,7 +126,8 @@ pub fn simulate_quarter(state: &mut GameState) {
             total_revenue * 4.0
         } else {
             0.0
-        };
+        }
+        - total_debt;
 
     check_achievements(state, total_revenue);
 
@@ -135,7 +135,7 @@ pub fn simulate_quarter(state: &mut GameState) {
         quarter,
         year: state.current_year,
         revenue: total_revenue,
-        expenses: total_expenses + hiring_costs + loyalty_cost + ecommerce_cost,
+        expenses: all_expenses,
         profit: final_profit,
         tax_paid: tax,
         cash_flow: final_profit,
@@ -173,7 +173,7 @@ pub fn simulate_quarter(state: &mut GameState) {
     let summary = format!(
         "Q{} {} | Revenue: {} | Expenses: {} | Profit: {} | Cash: {} | Decisions: {} made, {} delegated",
         quarter, state.current_year,
-        format_currency(total_revenue), format_currency(total_expenses),
+        format_currency(total_revenue), format_currency(all_expenses),
         format_currency(final_profit), format_currency(state.company.cash),
         state.decisions_made, state.decisions_delegated,
     );
@@ -204,47 +204,57 @@ fn auto_resolve_event(
         .map(|e| (e.position.short_title().to_string(), e.skill));
 
     let (choice_idx, description_prefix) = if let Some((ref exec_title, exec_skill)) = exec_info {
-        let best_idx = find_best_choice(&event.choices);
-        let pick_best = rng.gen_bool(exec_skill / 100.0);
-        let idx = if pick_best {
-            best_idx
+        if event.choices.is_empty() {
+            (0, format!("[DELEGATED] {} chose", exec_title))
         } else {
-            rng.gen_range(0..event.choices.len())
-        };
-        (idx, format!("[DELEGATED] {} chose", exec_title))
+            let best_idx = find_best_choice(&event.choices);
+            let pick_best = rng.gen_bool(exec_skill / 100.0);
+            let idx = if pick_best {
+                best_idx
+            } else {
+                rng.gen_range(0..event.choices.len())
+            };
+            (idx, format!("[DELEGATED] {} chose", exec_title))
+        }
     } else {
         let delegate_title = delegate_pos.short_title().to_string();
-        (
-            rng.gen_range(0..event.choices.len()),
-            format!("[AUTO] No {} hired, random", delegate_title),
-        )
+        if event.choices.is_empty() {
+            (0, format!("[AUTO] No {} hired, random", delegate_title))
+        } else {
+            (
+                rng.gen_range(0..event.choices.len()),
+                format!("[AUTO] No {} hired, random", delegate_title),
+            )
+        }
     };
 
-    let choice = &event.choices[choice_idx];
-    apply_event_effects(state, &choice.effects);
-    state.decisions_delegated += 1;
+    if choice_idx < event.choices.len() {
+        let choice = &event.choices[choice_idx];
+        apply_event_effects(state, &choice.effects);
+        state.decisions_delegated += 1;
 
-    state.log_event(GameEvent {
-        id: event.id.clone(),
-        title: event.title.clone(),
-        description: format!("{}: {}", description_prefix, choice.label),
-        event_type: category_to_event_type(event.category),
-        impact: EventImpact {
-            cash_impact: choice.effects.cash,
-            revenue_impact: choice.effects.revenue_modifier,
-            expense_impact: choice.effects.expense_modifier,
-            morale_impact: choice.effects.morale,
-            reputation_impact: choice.effects.reputation,
-            satisfaction_impact: choice.effects.satisfaction,
-        },
-        quarter: event.quarter,
-        year: event.year,
-    });
+        state.log_event(GameEvent {
+            id: event.id.clone(),
+            title: event.title.clone(),
+            description: format!("{}: {}", description_prefix, choice.label),
+            event_type: category_to_event_type(event.category),
+            impact: EventImpact {
+                cash_impact: choice.effects.cash,
+                revenue_impact: choice.effects.revenue_modifier,
+                expense_impact: choice.effects.expense_modifier,
+                morale_impact: choice.effects.morale,
+                reputation_impact: choice.effects.reputation,
+                satisfaction_impact: choice.effects.satisfaction,
+            },
+            quarter: event.quarter,
+            year: event.year,
+        });
 
-    state.push_message(format!(
-        "{} decision on '{}': {}",
-        description_prefix, event.title, choice.label
-    ));
+        state.push_message(format!(
+            "{} decision on '{}': {}",
+            description_prefix, event.title, choice.label
+        ));
+    }
 }
 
 fn find_best_choice(choices: &[EventChoice]) -> usize {

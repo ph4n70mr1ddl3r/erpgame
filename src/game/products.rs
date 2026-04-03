@@ -181,12 +181,18 @@ pub fn invest_in_category(
     categories: &mut [ProductCategory],
     category_id: &str,
     amount: f64,
-) -> f64 {
+) -> (f64, f64) {
     if let Some(cat) = categories.iter_mut().find(|c| c.id == category_id) {
-        let increase = (amount / 500_000.0).min(5.0);
-        cat.investment_level = (cat.investment_level + increase).min(100.0);
-        increase
+        let headroom = 100.0 - cat.investment_level;
+        if headroom <= 0.0 {
+            return (0.0, 0.0);
+        }
+        let desired_increase = (amount / 500_000.0).min(5.0);
+        let actual_increase = desired_increase.min(headroom);
+        let actual_cost = (actual_increase / 5.0) * amount.min(5.0 * 500_000.0).min(amount);
+        cat.investment_level = (cat.investment_level + actual_increase).min(100.0);
+        (actual_increase, actual_cost)
     } else {
-        0.0
+        (0.0, 0.0)
     }
 }

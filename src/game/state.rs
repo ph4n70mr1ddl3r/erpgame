@@ -1033,8 +1033,7 @@ impl GameState {
                 quarter: event.quarter,
                 year: event.year,
             });
-            self.messages
-                .push_back(format!("[DECISION] {}: {}", event.title, choice.label));
+            self.push_message(format!("[DECISION] {}: {}", event.title, choice.label));
         }
         Some(event)
     }

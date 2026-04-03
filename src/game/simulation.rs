@@ -321,10 +321,14 @@ fn update_economy(state: &mut GameState, rng: &mut rand::rngs::ThreadRng) {
     if state.current_quarter == 1 {
         let wage_increase = rng.gen_range(10.0..30.0);
         e.minimum_wage_daily = (e.minimum_wage_daily + wage_increase).clamp(450.0, 900.0);
-        state.messages.push_back(format!(
+        let msg = format!(
             "Government raised minimum wage to P{:.0}/day",
             e.minimum_wage_daily
-        ));
+        );
+        state.messages.push_back(msg);
+        while state.messages.len() > super::state::MAX_MESSAGES {
+            state.messages.pop_front();
+        }
     }
 }
 
@@ -339,6 +343,7 @@ fn update_seasonality(state: &mut GameState, quarter: i32) {
 }
 
 fn process_store_construction(state: &mut GameState) {
+    let mut opened: Vec<String> = Vec::new();
     for store in &mut state.stores {
         if store.status == StoreStatus::UnderConstruction {
             store.construction_quarters_left -= 1;
@@ -347,15 +352,16 @@ fn process_store_construction(state: &mut GameState) {
                 store.age_quarters = 0;
                 store.opened_quarter = state.current_quarter;
                 store.opened_year = state.current_year;
-                state
-                    .messages
-                    .push_back(format!("{} in {} is now OPEN!", store.name, store.city));
+                opened.push(format!("{} in {} is now OPEN!", store.name, store.city));
                 continue;
             }
         }
         if store.status == StoreStatus::Operating {
             store.age_quarters += 1;
         }
+    }
+    for msg in opened {
+        state.push_message(msg);
     }
 }
 
@@ -663,6 +669,8 @@ fn process_executive_decisions(state: &mut GameState, rng: &mut rand::rngs::Thre
     let performance_delta = if company_profitable { 1.0 } else { -3.0 };
     let morale_delta = if company_profitable { 1.5 } else { -2.0 };
 
+    let mut pending_msgs: Vec<String> = Vec::new();
+
     for exec in &mut state.executives {
         exec.tenure_quarters += 1;
         exec.performance_rating =
@@ -674,7 +682,7 @@ fn process_executive_decisions(state: &mut GameState, rng: &mut rand::rngs::Thre
         if exec.tenure_quarters % 4 == 0 {
             let raise = exec.salary_monthly * rng.gen_range(0.02..0.08);
             exec.salary_monthly += raise;
-            state.messages.push_back(format!(
+            pending_msgs.push(format!(
                 "{} got a raise to {}/month",
                 exec.name,
                 format_currency_full(exec.salary_monthly)
@@ -690,7 +698,7 @@ fn process_executive_decisions(state: &mut GameState, rng: &mut rand::rngs::Thre
             resigned.push((exec.name.clone(), exec.position));
             false
         } else if exec.morale < 30.0 {
-            state.messages.push_back(format!(
+            pending_msgs.push(format!(
                 "{} ({}) is considering leaving due to low morale!",
                 exec.name,
                 exec.position.short_title()
@@ -701,13 +709,17 @@ fn process_executive_decisions(state: &mut GameState, rng: &mut rand::rngs::Thre
         }
     });
 
+    for msg in pending_msgs {
+        state.push_message(msg);
+    }
+
     for (name, position) in resigned {
         for cat in EventCategory::all_categories() {
             if cat.delegate_position() == position && state.delegation.is_delegated(cat) {
                 state.delegation.set(cat, false);
             }
         }
-        state.messages.push_back(format!(
+        state.push_message(format!(
             "[RESIGNED] {} ({}) has resigned due to low morale! Position is now vacant.",
             name,
             position.short_title()

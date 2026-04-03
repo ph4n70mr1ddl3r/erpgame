@@ -189,7 +189,7 @@ pub fn invest_in_category(
         }
         let desired_increase = (amount / 500_000.0).min(5.0);
         let actual_increase = desired_increase.min(headroom);
-        let actual_cost = (actual_increase / 5.0) * amount.min(5.0 * 500_000.0).min(amount);
+        let actual_cost = actual_increase * 500_000.0;
         cat.investment_level = (cat.investment_level + actual_increase).min(100.0);
         (actual_increase, actual_cost)
     } else {

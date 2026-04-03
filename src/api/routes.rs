@@ -487,6 +487,13 @@ fn patience_color(value: f64) -> String {
     else { "#ef4444".to_string() }
 }
 
+fn pressure_color(value: f64) -> String {
+    if value < 30.0 { "#22c55e".to_string() }
+    else if value < 50.0 { "#f59e0b".to_string() }
+    else if value < 70.0 { "#f97316".to_string() }
+    else { "#ef4444".to_string() }
+}
+
 fn build_chart_data(s: &GameState) -> crate::api::dto::ChartData {
     let history = &s.financial_history;
     let labels: Vec<String> = history.iter().map(|r| format!("Q{} {}", r.quarter, r.year)).collect();
@@ -637,7 +644,7 @@ pub async fn board_page(State(state): State<AppState>) -> Response {
             patience: format!("{:.0}%", b.patience), patience_class: b.patience_class().to_string(),
             patience_color: patience_color(b.patience),
             pressure: format!("{:.0}%", b.pressure_level), pressure_class: b.pressure_class().to_string(),
-            pressure_color: String::new(),
+            pressure_color: pressure_color(b.pressure_level),
             warnings: b.warnings, description: b.description(),
             last_review: if b.last_review_year > 0 { format!("Q{} {}", b.last_review_quarter, b.last_review_year) } else { "None yet".into() },
             quarters_until_review: quarters_until,

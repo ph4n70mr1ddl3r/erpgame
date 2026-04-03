@@ -75,11 +75,11 @@ pub fn simulate_quarter(state: &mut GameState) {
     let cto_skill = find_exec_skill(state, ExecutivePosition::CTO);
 
     let total_revenue = calculate_revenue(state, &mut rng, cfo_skill, coo_skill);
+    let ecommerce_cost = process_ecommerce(state);
     let online_revenue = state.ecommerce.quarterly_online_revenue;
     let total_revenue = total_revenue + online_revenue;
     let total_expenses = calculate_expenses(state, operating_count, cto_skill);
     let loyalty_cost = update_loyalty(state);
-    let ecommerce_cost = process_ecommerce(state);
     let _ = process_campaigns(state);
     let loan_payments = process_loans(state);
     let event_impacts = process_random_events(state, &mut rng, total_revenue);
@@ -100,8 +100,6 @@ pub fn simulate_quarter(state: &mut GameState) {
         state.current_year,
         &mut state.messages,
     );
-
-    check_achievements(state, total_revenue);
 
     let gross_profit =
         total_revenue - total_expenses - hiring_costs - loyalty_cost - ecommerce_cost;
@@ -131,6 +129,8 @@ pub fn simulate_quarter(state: &mut GameState) {
             0.0
         };
 
+    check_achievements(state, total_revenue);
+
     let report = QuarterlyReport {
         quarter,
         year: state.current_year,
@@ -139,6 +139,8 @@ pub fn simulate_quarter(state: &mut GameState) {
         profit: final_profit,
         tax_paid: tax,
         cash_flow: final_profit,
+        cash_on_hand: state.company.cash,
+        event_impact: event_impacts.cash_impact,
         store_count: state.operating_store_count(),
         employee_count: state.employees.total_count,
         market_share: state.company.market_share,
@@ -246,6 +248,9 @@ fn auto_resolve_event(
 }
 
 fn find_best_choice(choices: &[EventChoice]) -> usize {
+    if choices.is_empty() {
+        return 0;
+    }
     let mut best_idx = 0;
     let mut best_score: f64 = f64::NEG_INFINITY;
     for (i, c) in choices.iter().enumerate() {
@@ -621,9 +626,12 @@ fn process_loans(state: &mut GameState) -> f64 {
         let loan = &mut state.company.loans[i];
         let quarterly_rate = loan.interest_rate / 100.0 / 4.0;
         let interest = loan.remaining * quarterly_rate;
-        let principal = (loan.quarterly_payment - interest).max(0.0);
+        let principal = (loan.quarterly_payment - interest)
+            .max(0.0)
+            .min(loan.remaining);
+        let actual_payment = interest + principal;
         loan.remaining -= principal;
-        total_payment += loan.quarterly_payment;
+        total_payment += actual_payment;
         loan.quarters_remaining -= 1;
         if loan.quarters_remaining <= 0 || loan.remaining <= 0.0 {
             state.company.loans.remove(i);
@@ -664,12 +672,12 @@ fn process_executive_decisions(state: &mut GameState, rng: &mut rand::rngs::Thre
         }
     }
 
-    let mut resigned: Vec<(String, String)> = vec![];
+    let mut resigned: Vec<(String, ExecutivePosition)> = vec![];
     state.executives.retain(|exec| {
         let should_resign = (exec.morale < 25.0 && exec.loyalty < 30.0 && rng.gen_bool(0.5))
             || (exec.morale < 35.0 && exec.morale >= 25.0 && rng.gen_bool(0.2));
         if should_resign {
-            resigned.push((exec.name.clone(), exec.position.short_title().to_string()));
+            resigned.push((exec.name.clone(), exec.position));
             false
         } else if exec.morale < 30.0 {
             state.messages.push_back(format!(
@@ -683,10 +691,16 @@ fn process_executive_decisions(state: &mut GameState, rng: &mut rand::rngs::Thre
         }
     });
 
-    for (name, pos) in resigned {
+    for (name, position) in resigned {
+        for cat in EventCategory::all_categories() {
+            if cat.delegate_position() == position && state.delegation.is_delegated(cat) {
+                state.delegation.set(cat, false);
+            }
+        }
         state.messages.push_back(format!(
             "[RESIGNED] {} ({}) has resigned due to low morale! Position is now vacant.",
-            name, pos
+            name,
+            position.short_title()
         ));
     }
 

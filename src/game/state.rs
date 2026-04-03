@@ -288,6 +288,8 @@ pub struct QuarterlyReport {
     pub profit: f64,
     pub tax_paid: f64,
     pub cash_flow: f64,
+    pub cash_on_hand: f64,
+    pub event_impact: f64,
     pub store_count: u32,
     pub employee_count: u32,
     pub market_share: f64,
@@ -317,7 +319,7 @@ pub enum EventType {
     Regulation,
     SupplyChain,
     Positive,
-    Negative,
+    Technology,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -837,7 +839,7 @@ pub fn format_currency_full(amount: f64) -> String {
     }
     let rounded = amount.round();
     let is_negative = rounded < 0.0;
-    let abs = rounded.abs() as u64;
+    let abs = rounded.abs() as u128;
     let s = abs.to_string();
     let chars: Vec<char> = s.chars().collect();
     let mut result = String::new();
@@ -973,7 +975,7 @@ impl GameState {
         self.executives.iter().any(|e| e.position == position)
     }
 
-    pub fn advance_quarter_label(&self) -> String {
+    pub fn current_quarter_label(&self) -> String {
         let q = self.current_quarter;
         let y = self.current_year;
         format!("Q{} {}", q, y)
@@ -1063,7 +1065,7 @@ pub fn category_to_event_type(cat: EventCategory) -> EventType {
         EventCategory::HR => EventType::Employee,
         EventCategory::SupplyChain => EventType::SupplyChain,
         EventCategory::Competition => EventType::Competition,
-        EventCategory::Technology => EventType::Positive,
+        EventCategory::Technology => EventType::Technology,
         EventCategory::Regulation => EventType::Regulation,
     }
 }

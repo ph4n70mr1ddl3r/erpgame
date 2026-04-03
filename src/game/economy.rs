@@ -186,7 +186,7 @@ impl EventType {
             EventType::Regulation => "Clipboard",
             EventType::SupplyChain => "Ship",
             EventType::Positive => "Sparkles",
-            EventType::Negative => "Alert",
+            EventType::Technology => "Cpu",
         }
     }
 }

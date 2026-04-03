@@ -59,7 +59,7 @@ pub async fn dashboard(State(state): State<AppState>) -> Response {
         store_count: operating_count,
         employee_count: s.employees.total_count,
         executive_count: s.executives.len(),
-        current_quarter: s.advance_quarter_label(),
+        current_quarter: s.current_quarter_label(),
         next_quarter: next_q,
         game_over: s.game_over,
         messages: s.messages_vec(),
@@ -112,7 +112,7 @@ pub async fn stores_page(State(state): State<AppState>) -> Response {
         StoreTypeOption { key: "depot".into(), label: "Depot".into(), size: 18000, cost: format_currency(StoreType::Depot.opening_cost()), construction: StoreType::Depot.construction_quarters() },
     ];
 
-    crate::templates::StoresTemplate { store_rows, cities, store_types, cash: format_currency_full(s.company.cash), messages: s.messages_vec(), current_quarter: s.advance_quarter_label(), active_page: "stores".to_string() }.into_response()
+    crate::templates::StoresTemplate { store_rows, cities, store_types, cash: format_currency_full(s.company.cash), messages: s.messages_vec(), current_quarter: s.current_quarter_label(), active_page: "stores".to_string() }.into_response()
 }
 
 pub async fn open_store(State(state): State<AppState>, Form(form): Form<NewStoreForm>) -> Response {
@@ -124,7 +124,10 @@ pub async fn open_store(State(state): State<AppState>, Form(form): Form<NewStore
             state.push_message(format!("Cannot open store: need {} but only have {}", format_currency(cost), format_currency(current_cash)));
         return Redirect::to("/stores").into_response();
     }
-    let store_name_raw = form.store_name.clone();
+    let mut store_name_raw = form.store_name.clone();
+    if store_name_raw.len() > 100 {
+        store_name_raw.truncate(100);
+    }
     let cities = get_available_cities();
     let (region, city_name) = match cities.iter().find(|c| c.name == form.city) {
         Some(c) => (c.region, c.name.clone()),
@@ -134,7 +137,7 @@ pub async fn open_store(State(state): State<AppState>, Form(form): Form<NewStore
         }
     };
     state.company.cash -= cost;
-    let store_name = if store_name_raw.is_empty() { format!("Bahay Depot {}", city_name) } else { store_name_raw.clone() };
+    let store_name = if store_name_raw.is_empty() { format!("Bahay Depot {}", city_name) } else { store_name_raw };
     let store = Store {
         id: uuid::Uuid::new_v4().to_string(), name: store_name, city: city_name, region, store_type,
         size_sqm: store_type.default_size(), status: StoreStatus::UnderConstruction, quarterly_revenue: 0.0,
@@ -186,7 +189,7 @@ pub async fn executives_page(State(state): State<AppState>) -> Response {
     let mut open_positions = Vec::new();
     for pos in ExecutivePosition::all_positions() { if !s.is_executive_hired(pos) { open_positions.push(pos.title().to_string()); } }
 
-    crate::templates::ExecutivesTemplate { executives: exec_rows, open_positions, cash: format_currency_full(s.company.cash), messages: s.messages_vec(), current_quarter: s.advance_quarter_label(), active_page: "executives".to_string() }.into_response()
+    crate::templates::ExecutivesTemplate { executives: exec_rows, open_positions, cash: format_currency_full(s.company.cash), messages: s.messages_vec(), current_quarter: s.current_quarter_label(), active_page: "executives".to_string() }.into_response()
 }
 
 pub async fn hire_executive(State(state): State<AppState>, Form(form): Form<HireExecutiveForm>) -> Response {
@@ -272,7 +275,7 @@ pub async fn policies_page(State(state): State<AppState>) -> Response {
         customer_service: p.customer_service.label().into(), customer_service_key: p.customer_service.key().into(),
         marketing: p.marketing.label().into(), marketing_key: p.marketing.key().into(),
         inventory: p.inventory.label().into(), inventory_key: p.inventory.key().into(),
-        messages: s.messages_vec(), current_quarter: s.advance_quarter_label(), active_page: "policies".to_string(),
+        messages: s.messages_vec(), current_quarter: s.current_quarter_label(), active_page: "policies".to_string(),
     }.into_response()
 }
 
@@ -324,7 +327,7 @@ pub async fn finances_page(State(state): State<AppState>) -> Response {
         total_loans: format_currency(total_loan_remaining), tax_rate: pct(s.economy.corporate_tax_rate),
         interest_rate: pct(s.economy.interest_rate), financial_history, loans,
         max_loan: format_currency_full(max_loan), suggested_rate: format!("{:.1}", suggested_rate),
-        messages: s.messages_vec(), current_quarter: s.advance_quarter_label(), active_page: "finances".to_string(),
+        messages: s.messages_vec(), current_quarter: s.current_quarter_label(), active_page: "finances".to_string(),
     }.into_response()
 }
 
@@ -343,9 +346,14 @@ pub async fn take_loan(State(state): State<AppState>, Form(form): Form<LoanForm>
         return Redirect::to("/finances").into_response();
     }
     let rate = state.economy.interest_rate + 1.5;
-    let total_with_interest = amount * (1.0 + rate / 100.0 * quarters as f64 / 4.0);
-    let quarterly_payment = total_with_interest / quarters as f64;
-    let loan = Loan { id: uuid::Uuid::new_v4().to_string(), amount, interest_rate: rate, remaining: total_with_interest, quarterly_payment, quarters_remaining: quarters };
+    let quarterly_rate = rate / 100.0 / 4.0;
+    let n = quarters as f64;
+    let quarterly_payment = if quarterly_rate > 0.0 {
+        amount * quarterly_rate * (1.0 + quarterly_rate).powf(n) / ((1.0 + quarterly_rate).powf(n) - 1.0)
+    } else {
+        amount / n
+    };
+    let loan = Loan { id: uuid::Uuid::new_v4().to_string(), amount, interest_rate: rate, remaining: amount, quarterly_payment, quarters_remaining: quarters };
     state.company.cash += amount;
     state.company.has_ever_had_loan = true;
     state.company.loans.push(loan);
@@ -363,7 +371,7 @@ pub async fn events_page(State(state): State<AppState>) -> Response {
     let state = state.lock().await;
     let s = &*state;
     let events: Vec<EventRow> = s.event_log.iter().take(30).map(|e| EventRow { title: e.title.clone(), icon: e.event_type.icon().into(), quarter: format!("Q{} {}", e.quarter, e.year) }).collect();
-    crate::templates::EventsTemplate { events, messages: s.messages_vec(), current_quarter: s.advance_quarter_label(), active_page: "events".to_string() }.into_response()
+    crate::templates::EventsTemplate { events, messages: s.messages_vec(), current_quarter: s.current_quarter_label(), active_page: "events".to_string() }.into_response()
 }
 
 pub async fn decisions_page(State(state): State<AppState>) -> Response {
@@ -391,7 +399,7 @@ pub async fn decisions_page(State(state): State<AppState>) -> Response {
         decisions_made: s.decisions_made,
         decisions_delegated: s.decisions_delegated,
         messages: s.messages_vec(),
-        current_quarter: s.advance_quarter_label(),
+        current_quarter: s.current_quarter_label(),
         active_page: "decisions".to_string(),
     }.into_response()
 }
@@ -428,7 +436,7 @@ pub async fn delegation_page(State(state): State<AppState>) -> Response {
     crate::templates::DelegationTemplate {
         rows,
         messages: s.messages_vec(),
-        current_quarter: s.advance_quarter_label(),
+        current_quarter: s.current_quarter_label(),
         active_page: "delegation".to_string(),
     }.into_response()
 }
@@ -493,13 +501,7 @@ fn build_chart_data(s: &GameState) -> crate::api::dto::ChartData {
     let expenses: Vec<f64> = history.iter().map(|r| r.expenses / 1_000_000.0).collect();
     let profit: Vec<f64> = history.iter().map(|r| r.profit / 1_000_000.0).collect();
 
-    let mut cash = Vec::new();
-    let mut running_cash = s.company.cash
-        - history.iter().map(|r| r.cash_flow).sum::<f64>();
-    for r in history {
-        running_cash += r.cash_flow;
-        cash.push(running_cash / 1_000_000.0);
-    }
+    let cash: Vec<f64> = history.iter().map(|r| r.cash_on_hand / 1_000_000.0).collect();
 
     let market_share: Vec<f64> = history.iter().map(|r| r.market_share).collect();
     let customer_sat: Vec<f64> = history.iter().map(|r| r.customer_satisfaction).collect();
@@ -534,7 +536,7 @@ pub async fn products_page(State(state): State<AppState>) -> Response {
     crate::templates::ProductsTemplate {
         rows, cash: format_currency_full(s.company.cash),
         total_invested: format_currency(total_invested),
-        messages: s.messages_vec(), current_quarter: s.advance_quarter_label(),
+        messages: s.messages_vec(), current_quarter: s.current_quarter_label(),
         active_page: "products".to_string(),
     }.into_response()
 }
@@ -589,7 +591,7 @@ pub async fn upgrades_page(State(state): State<AppState>) -> Response {
 
     crate::templates::UpgradesTemplate {
         store_rows, cash: format_currency_full(s.company.cash),
-        messages: s.messages_vec(), current_quarter: s.advance_quarter_label(),
+        messages: s.messages_vec(), current_quarter: s.current_quarter_label(),
         active_page: "upgrades".to_string(),
     }.into_response()
 }
@@ -636,7 +638,7 @@ pub async fn board_page(State(state): State<AppState>) -> Response {
         company_value: format_currency(s.company.company_value),
         market_share: pct(s.company.market_share),
         competitor_share: pct(total_competitor_market_share(&s.competitors)),
-        messages: s.messages_vec(), current_quarter: s.advance_quarter_label(),
+        messages: s.messages_vec(), current_quarter: s.current_quarter_label(),
         active_page: "board".to_string(),
     }.into_response()
 }
@@ -655,7 +657,7 @@ pub async fn competitors_page(State(state): State<AppState>) -> Response {
     }).collect();
     crate::templates::CompetitorsTemplate {
         rows, player_share: pct(s.company.market_share),
-        messages: s.messages_vec(), current_quarter: s.advance_quarter_label(),
+        messages: s.messages_vec(), current_quarter: s.current_quarter_label(),
         active_page: "competitors".to_string(),
     }.into_response()
 }
@@ -673,7 +675,7 @@ pub async fn achievements_page(State(state): State<AppState>) -> Response {
     let unlocked = unlocked_count(&s.achievements);
     crate::templates::AchievementsTemplate {
         rows, total, unlocked,
-        messages: s.messages_vec(), current_quarter: s.advance_quarter_label(),
+        messages: s.messages_vec(), current_quarter: s.current_quarter_label(),
         active_page: "achievements".to_string(),
     }.into_response()
 }
@@ -749,7 +751,7 @@ pub async fn loyalty_page(State(state): State<AppState>) -> Response {
         tiers,
         cash: format_currency_full(s.company.cash),
         messages: s.messages_vec(),
-        current_quarter: s.advance_quarter_label(),
+        current_quarter: s.current_quarter_label(),
         active_page: "loyalty".to_string(),
     }.into_response()
 }
@@ -860,7 +862,7 @@ pub async fn campaigns_page(State(state): State<AppState>) -> Response {
         active_count: s.campaigns.len(),
         cash: format_currency_full(s.company.cash),
         messages: s.messages_vec(),
-        current_quarter: s.advance_quarter_label(),
+        current_quarter: s.current_quarter_label(),
         active_page: "campaigns".to_string(),
     }.into_response()
 }
@@ -896,7 +898,12 @@ pub async fn ecommerce_page(State(state): State<AppState>) -> Response {
     let current = s.ecommerce.level;
 
     let effective_pct = if current != EcommerceLevel::None {
-        format!("{:.1}%", current.revenue_bonus() * 100.0)
+        let cto_skill = s.executives.iter().find(|e| e.position == ExecutivePosition::CTO).map(|e| e.skill).unwrap_or(0.0);
+        let cto_factor = 1.0 + cto_skill * 0.005;
+        let sat_factor = s.company.customer_satisfaction / 100.0;
+        let base_bonus = current.revenue_bonus();
+        let effective = base_bonus * cto_factor * sat_factor;
+        format!("{:.1}%", effective * 100.0)
     } else {
         "-".into()
     };
@@ -950,7 +957,7 @@ pub async fn ecommerce_page(State(state): State<AppState>) -> Response {
         levels,
         cash: format_currency_full(s.company.cash),
         messages: s.messages_vec(),
-        current_quarter: s.advance_quarter_label(),
+        current_quarter: s.current_quarter_label(),
         active_page: "ecommerce".to_string(),
     }.into_response()
 }

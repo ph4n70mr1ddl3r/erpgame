@@ -412,3 +412,38 @@ pub struct WarehouseTierRow {
 pub struct WarehouseForm {
     pub tier: String,
 }
+
+#[derive(Debug, Deserialize)]
+pub struct PrivateLabelForm {
+    pub category_id: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct PrivateLabelRow {
+    pub id: String,
+    pub brand_name: String,
+    pub category: String,
+    pub status: String,
+    pub status_class: String,
+    pub development_progress: String,
+    pub quarters_remaining: i32,
+    pub brand_power: String,
+    pub brand_power_class: String,
+    pub margin_rate: String,
+    pub quarterly_revenue: String,
+    pub total_revenue: String,
+    pub quarterly_cost: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct PrivateLabelCategoryOption {
+    pub category_id: String,
+    pub category_name: String,
+    pub development_cost: String,
+    pub development_quarters: i32,
+    pub base_margin: String,
+    pub quarterly_cost: String,
+    pub can_start: bool,
+    pub reason: String,
+    pub show_reason: bool,
+}

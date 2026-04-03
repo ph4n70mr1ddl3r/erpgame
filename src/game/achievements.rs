@@ -197,6 +197,22 @@ pub fn default_achievements() -> Vec<Achievement> {
             unlocked: false,
             unlocked_quarter: None,
         },
+        Achievement {
+            id: "own_brand_empire".into(),
+            title: "Own Brand Empire".into(),
+            description: "Have active private label brands in all 8 product categories".into(),
+            icon: "Tag".into(),
+            unlocked: false,
+            unlocked_quarter: None,
+        },
+        Achievement {
+            id: "pl_revenue_100m".into(),
+            title: "Private Label Mogul".into(),
+            description: "Earn P100M+ total private label revenue".into(),
+            icon: "Package".into(),
+            unlocked: false,
+            unlocked_quarter: None,
+        },
     ]
 }
 
@@ -323,6 +339,27 @@ pub fn check_achievements(state: &mut GameState, last_revenue: f64) {
         "online_mogul",
         &q_label,
         state.ecommerce.total_online_revenue >= 500_000_000.0,
+    );
+
+    let active_pl_categories: std::collections::HashSet<String> = state
+        .private_labels
+        .iter()
+        .filter(|pl| pl.status == super::private_label::PrivateLabelStatus::Active)
+        .map(|pl| pl.category_id.clone())
+        .collect();
+    check_one(
+        state,
+        "own_brand_empire",
+        &q_label,
+        active_pl_categories.len() >= 8,
+    );
+
+    let total_pl_revenue: f64 = state.private_labels.iter().map(|pl| pl.total_revenue).sum();
+    check_one(
+        state,
+        "pl_revenue_100m",
+        &q_label,
+        total_pl_revenue >= 100_000_000.0,
     );
 }
 

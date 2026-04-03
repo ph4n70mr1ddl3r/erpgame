@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1 style="font-size: 1.5rem; font-weight: 700; margin-bottom: 0.25rem;">Private Label Brands</h1>
+<p style="color: #64748b; margin-bottom: 1rem;">Develop your own Bahay Depot branded products across categories. Higher margins than national brands, but requires upfront investment and development time. Your CMO's skill boosts brand power growth and revenue.</p>
+
+{% if messages.len() > 0 %}
+<div style="margin-bottom: 1rem;">
+    {% for msg in messages %}
+    <div class="message msg-info">{{ msg }}</div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+    <div class="stat-card">
+        <div style="font-size: 0.75rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em;">Active Brands</div>
+        <div style="font-size: 1.5rem; font-weight: 700; margin-top: 0.25rem; color: #22c55e;">{{ active_count }}</div>
+    </div>
+    <div class="stat-card">
+        <div style="font-size: 0.75rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em;">Developing</div>
+        <div style="font-size: 1.5rem; font-weight: 700; margin-top: 0.25rem; color: #f59e0b;">{{ developing_count }}</div>
+    </div>
+    <div class="stat-card">
+        <div style="font-size: 0.75rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em;">Quarterly Revenue</div>
+        <div style="font-size: 1.5rem; font-weight: 700; margin-top: 0.25rem; color: #22c55e;">{{ total_quarterly_revenue }}</div>
+    </div>
+    <div class="stat-card">
+        <div style="font-size: 0.75rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em;">Total PL Revenue</div>
+        <div style="font-size: 1.25rem; font-weight: 700; margin-top: 0.25rem;">{{ total_pl_revenue }}</div>
+    </div>
+    <div class="stat-card">
+        <div style="font-size: 0.75rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em;">Quarterly Marketing</div>
+        <div style="font-size: 1.25rem; font-weight: 700; margin-top: 0.25rem; color: #f59e0b;">{{ total_quarterly_cost }}</div>
+    </div>
+    <div class="stat-card">
+        <div style="font-size: 0.75rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em;">CMO Skill</div>
+        <div style="font-size: 1.5rem; font-weight: 700; margin-top: 0.25rem;">{{ cmo_skill }}</div>
+        <div style="font-size: 0.7rem; color: #64748b; margin-top: 0.15rem;">Boosts brand power & revenue</div>
+    </div>
+</div>
+
+{% if brand_rows.len() > 0 %}
+<h2 style="font-size: 1.1rem; font-weight: 600; margin-bottom: 0.75rem;">Your Brands</h2>
+<div style="overflow-x: auto; margin-bottom: 1.5rem;">
+<table>
+    <thead>
+        <tr>
+            <th>Brand</th>
+            <th>Category</th>
+            <th>Status</th>
+            <th>Progress</th>
+            <th>Brand Power</th>
+            <th>Margin</th>
+            <th>Q Revenue</th>
+            <th>Total Revenue</th>
+            <th>Q Cost</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for row in brand_rows %}
+        <tr>
+            <td style="font-weight: 600;">{{ row.brand_name }}</td>
+            <td>{{ row.category }}</td>
+            <td class="{{ row.status_class }}">{{ row.status }}</td>
+            <td>{{ row.development_progress }}{% if row.status == "Developing" %} ({{ row.quarters_remaining }}Q left){% endif %}</td>
+            <td class="{{ row.brand_power_class }}">{{ row.brand_power }}</td>
+            <td style="color: #22c55e;">{{ row.margin_rate }}</td>
+            <td>{{ row.quarterly_revenue }}</td>
+            <td>{{ row.total_revenue }}</td>
+            <td style="color: #f59e0b;">{{ row.quarterly_cost }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+</div>
+{% endif %}
+
+<h2 style="font-size: 1.1rem; font-weight: 600; margin-bottom: 0.75rem;">Develop New Brand</h2>
+
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1rem;">
+    {% for cat in category_options %}
+    <div class="card" style="padding: 1rem;">
+        <h3 style="font-size: 1rem; font-weight: 600; margin-bottom: 0.5rem;">{{ cat.category_name }}</h3>
+        <div style="font-size: 0.8rem; color: #64748b; margin-bottom: 0.5rem;">
+            <div>Development Cost: <span style="color: #e2e8f0;">{{ cat.development_cost }}</span></div>
+            <div>Development Time: <span style="color: #e2e8f0;">{{ cat.development_quarters }} quarter(s)</span></div>
+            <div>Base Margin: <span style="color: #22c55e;">{{ cat.base_margin }}</span></div>
+            <div>Quarterly Marketing: <span style="color: #f59e0b;">{{ cat.quarterly_cost }}</span></div>
+        </div>
+        {% if cat.can_start %}
+        <form action="/private-label/develop" method="POST" style="margin-top: 0.5rem;">
+            <input type="hidden" name="category_id" value="{{ cat.category_id }}">
+            <button type="submit" class="btn-primary btn-sm" style="width: 100%;">Start Development</button>
+        </form>
+        {% else if cat.show_reason %}
+        <div style="font-size: 0.75rem; color: #ef4444; margin-top: 0.5rem; text-align: center;">{{ cat.reason }}</div>
+        {% endif %}
+    </div>
+    {% endfor %}
+</div>
+
+<div style="margin-top: 1.5rem; text-align: center; font-size: 0.8rem; color: #64748b;">
+    Cash on hand: <span style="color: #e2e8f0;">{{ cash }}</span>
+</div>
+
+{% endblock %}

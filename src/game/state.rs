@@ -47,6 +47,8 @@ pub struct GameState {
     pub ecommerce: super::ecommerce::EcommerceChannel,
     #[serde(default)]
     pub supply_chain: super::supply_chain::SupplyChainState,
+    #[serde(default)]
+    pub private_labels: Vec<super::private_label::PrivateLabelBrand>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -964,6 +966,7 @@ impl GameState {
             campaigns: vec![],
             ecommerce: super::ecommerce::EcommerceChannel::new(),
             supply_chain: super::supply_chain::SupplyChainState::new(),
+            private_labels: vec![],
         }
     }
 

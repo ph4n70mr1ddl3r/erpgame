@@ -184,6 +184,10 @@ pub fn generate_pending_events(
         Box::new(reg_tax_audit),
         Box::new(reg_minimum_wage),
         Box::new(reg_environmental),
+        Box::new(pl_quality_recall),
+        Box::new(pl_brand_milestone),
+        Box::new(pl_supplier_pushback),
+        Box::new(pl_market_opportunity),
     ];
 
     pool.shuffle(rng);
@@ -912,4 +916,77 @@ fn reg_environmental(s: &GameState, r: &mut rand::rngs::ThreadRng) -> Option<Pen
         s.current_quarter,
         s.current_year,
     ))
+}
+
+fn pl_quality_recall(s: &GameState, r: &mut rand::rngs::ThreadRng) -> Option<PendingEvent> {
+    let has_active = s
+        .private_labels
+        .iter()
+        .any(|pl| pl.status == super::private_label::PrivateLabelStatus::Active);
+    if !r.gen_bool(0.04) || !has_active {
+        return None;
+    }
+    Some(make_event("Private Label Quality Issue", "Customer complaints have surfaced about one of your private label products. Quality testing revealed defects in a recent batch.", EventCategory::Marketing, vec![
+        make_choice("Full Recall & Refund", "Recall all affected products and issue refunds. Expensive but protects brand reputation.", "Low", EventEffects { cash: -4_000_000.0, revenue_modifier: -0.02, expense_modifier: 2_000_000.0, morale: -2.0, reputation: 5.0, satisfaction: 4.0 }),
+        make_choice("Quiet Fix", "Fix the issue in future batches without public announcement. Cheaper but risks if more complaints surface.", "High", EventEffects { cash: -1_000_000.0, revenue_modifier: -0.01, expense_modifier: 500_000.0, morale: 0.0, reputation: -5.0, satisfaction: -3.0 }),
+        make_choice("Investigate & Improve", "Launch thorough investigation and invest in quality control. Moderate cost with long-term benefits.", "Medium", EventEffects { cash: -2_500_000.0, revenue_modifier: -0.01, expense_modifier: 1_200_000.0, morale: 2.0, reputation: 2.0, satisfaction: 1.0 }),
+    ], s.current_quarter, s.current_year))
+}
+
+fn pl_brand_milestone(s: &GameState, r: &mut rand::rngs::ThreadRng) -> Option<PendingEvent> {
+    let has_active = s.private_labels.iter().any(|pl| {
+        pl.status == super::private_label::PrivateLabelStatus::Active && pl.brand_power >= 60.0
+    });
+    if !r.gen_bool(0.05) || !has_active {
+        return None;
+    }
+    Some(make_event("Private Label Brand Recognition", "Your private label products are gaining strong market recognition. Industry analysts have taken notice.", EventCategory::Marketing, vec![
+        make_choice("Invest in Expansion", "Double down on marketing and expand the private label line. Capitalize on momentum.", "Medium", EventEffects { cash: -3_000_000.0, revenue_modifier: 0.05, expense_modifier: 1_500_000.0, morale: 5.0, reputation: 6.0, satisfaction: 2.0 }),
+        make_choice("Maintain Current Pace", "Keep current investment levels. Sustainable growth without overextension.", "Low", EventEffects { cash: -500_000.0, revenue_modifier: 0.02, expense_modifier: 500_000.0, morale: 2.0, reputation: 3.0, satisfaction: 1.0 }),
+        make_choice("License the Brand", "Explore licensing your brand to other retailers. New revenue stream but less control.", "Medium", EventEffects { cash: -1_000_000.0, revenue_modifier: 0.04, expense_modifier: 800_000.0, morale: 3.0, reputation: 4.0, satisfaction: 0.0 }),
+    ], s.current_quarter, s.current_year))
+}
+
+fn pl_supplier_pushback(s: &GameState, r: &mut rand::rngs::ThreadRng) -> Option<PendingEvent> {
+    let has_active = s
+        .private_labels
+        .iter()
+        .any(|pl| pl.status == super::private_label::PrivateLabelStatus::Active);
+    if !r.gen_bool(0.04) || !has_active {
+        return None;
+    }
+    Some(make_event("Supplier Pushback on Private Label", "Major suppliers are threatening to reduce volume discounts because your private label products compete with their brands.", EventCategory::SupplyChain, vec![
+        make_choice("Negotiate Compromise", "Offer to limit private label to certain categories in exchange for maintaining supplier discounts.", "Medium", EventEffects { cash: -500_000.0, revenue_modifier: -0.01, expense_modifier: 800_000.0, morale: 0.0, reputation: 1.0, satisfaction: 0.0 }),
+        make_choice("Stand Firm", "Continue private label expansion. May lose some supplier benefits but maintain strategic direction.", "High", EventEffects { cash: 0.0, revenue_modifier: 0.01, expense_modifier: 2_000_000.0, morale: 2.0, reputation: -2.0, satisfaction: 0.0 }),
+        make_choice("Strategic Partnership", "Propose co-branding opportunities with suppliers. Share revenue in exchange for cooperation.", "Medium", EventEffects { cash: -1_500_000.0, revenue_modifier: 0.02, expense_modifier: 1_000_000.0, morale: 3.0, reputation: 3.0, satisfaction: 1.0 }),
+    ], s.current_quarter, s.current_year))
+}
+
+fn pl_market_opportunity(s: &GameState, r: &mut rand::rngs::ThreadRng) -> Option<PendingEvent> {
+    let has_none = s
+        .private_labels
+        .iter()
+        .filter(|pl| pl.status != super::private_label::PrivateLabelStatus::Discontinued)
+        .count()
+        == 0;
+    let has_active = s
+        .private_labels
+        .iter()
+        .any(|pl| pl.status == super::private_label::PrivateLabelStatus::Active);
+    if !r.gen_bool(0.05) || (!has_none && !has_active) {
+        return None;
+    }
+    if has_none {
+        Some(make_event("Private Label Opportunity", "Market research shows strong demand for own-brand products in home improvement. Competitors with private labels report 15-25% higher margins.", EventCategory::Marketing, vec![
+            make_choice("Start Research", "Invest P2M in market research for private label potential. First step toward brand development.", "Low", EventEffects { cash: -2_000_000.0, revenue_modifier: 0.0, expense_modifier: 500_000.0, morale: 3.0, reputation: 2.0, satisfaction: 0.0 }),
+            make_choice("Defer for Now", "Focus on core operations first. Private label can wait until the company is more stable.", "Low", no_effects()),
+            make_choice("Aggressive Entry", "Skip research and start developing a private label immediately. Higher risk but faster time to market.", "High", EventEffects { cash: -5_000_000.0, revenue_modifier: 0.02, expense_modifier: 2_000_000.0, morale: 5.0, reputation: 3.0, satisfaction: 1.0 }),
+        ], s.current_quarter, s.current_year))
+    } else {
+        Some(make_event("Private Label Expansion", "Your successful private label brands present an opportunity to expand into adjacent product categories.", EventCategory::Marketing, vec![
+            make_choice("Expand to New Category", "Start developing a private label in a new product category. Build on existing brand strength.", "Medium", EventEffects { cash: -8_000_000.0, revenue_modifier: 0.03, expense_modifier: 2_500_000.0, morale: 4.0, reputation: 4.0, satisfaction: 2.0 }),
+            make_choice("Deepen Existing Brands", "Invest more in marketing existing private labels. Strengthen brand power before expanding.", "Low", EventEffects { cash: -3_000_000.0, revenue_modifier: 0.02, expense_modifier: 1_000_000.0, morale: 3.0, reputation: 3.0, satisfaction: 1.0 }),
+            make_choice("Wait and See", "Monitor current private label performance before expanding. Patient approach.", "Low", no_effects()),
+        ], s.current_quarter, s.current_year))
+    }
 }

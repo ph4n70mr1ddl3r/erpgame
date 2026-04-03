@@ -9,6 +9,7 @@ use super::competitors::{
 use super::ecommerce::process_ecommerce;
 use super::events::{generate_auto_events, generate_pending_events};
 use super::loyalty::{loyalty_revenue_multiplier, update_loyalty};
+use super::private_label::process_private_labels;
 use super::products::{
     total_product_margin_modifier, total_product_revenue_modifier, update_product_categories,
 };
@@ -76,8 +77,10 @@ pub fn simulate_quarter(state: &mut GameState) {
     let total_revenue = calculate_revenue(state, &mut rng, cfo_skill, coo_skill);
     let ecommerce_cost = process_ecommerce(state);
     let supply_chain_cost = process_supply_chain(state);
+    let private_label_net = process_private_labels(state, &mut rng);
     let online_revenue = state.ecommerce.quarterly_online_revenue;
-    let total_revenue = total_revenue + online_revenue;
+    let pl_revenue = super::private_label::private_label_revenue(state);
+    let total_revenue = total_revenue + online_revenue + pl_revenue;
     let total_expenses = calculate_expenses(state, operating_count, cto_skill);
     let loyalty_cost = update_loyalty(state);
     process_campaigns(state);
@@ -90,8 +93,16 @@ pub fn simulate_quarter(state: &mut GameState) {
     update_company_metrics(state, &mut rng);
 
     let operating_count = state.operating_store_count();
-    let all_expenses =
-        total_expenses + hiring_costs + loyalty_cost + ecommerce_cost + supply_chain_cost;
+    let all_expenses = total_expenses
+        + hiring_costs
+        + loyalty_cost
+        + ecommerce_cost
+        + supply_chain_cost
+        + if private_label_net < 0.0 {
+            -private_label_net
+        } else {
+            0.0
+        };
     let board_game_over = update_board(
         &mut state.board,
         total_revenue,

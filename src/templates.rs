@@ -262,3 +262,20 @@ pub struct SupplyChainTemplate {
     pub current_quarter: String,
     pub active_page: String,
 }
+
+#[derive(Template)]
+#[template(path = "private_label.html")]
+pub struct PrivateLabelTemplate {
+    pub brand_rows: Vec<crate::api::dto::PrivateLabelRow>,
+    pub category_options: Vec<crate::api::dto::PrivateLabelCategoryOption>,
+    pub active_count: usize,
+    pub developing_count: usize,
+    pub total_quarterly_revenue: String,
+    pub total_pl_revenue: String,
+    pub total_quarterly_cost: String,
+    pub cmo_skill: String,
+    pub cash: String,
+    pub messages: Vec<String>,
+    pub current_quarter: String,
+    pub active_page: String,
+}

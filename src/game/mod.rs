@@ -7,6 +7,7 @@ pub mod economy;
 pub mod events;
 pub mod executive_ai;
 pub mod loyalty;
+pub mod private_label;
 pub mod products;
 pub mod simulation;
 pub mod state;

@@ -16,6 +16,7 @@ use crate::game::{
     campaigns::{CampaignType, campaign_revenue_multiplier, launch_campaign},
     ecommerce::{EcommerceLevel, upgrade_ecommerce},
     loyalty::{LoyaltyTier, loyalty_revenue_multiplier},
+    private_label::{self, PrivateLabelStatus},
     products::invest_in_category, upgrades::purchase_upgrade as do_purchase_upgrade,
     supply_chain::{
         SupplierCategory, LogisticsLevel, WarehouseTier,
@@ -1224,4 +1225,103 @@ pub async fn upgrade_warehouse_route(State(state): State<AppState>, Form(form): 
         }
     }
     Redirect::to("/supply-chain").into_response()
+}
+
+pub async fn private_label_page(State(state): State<AppState>) -> Response {
+    let state = state.lock().await;
+    let s = &*state;
+
+    let brand_rows: Vec<crate::api::dto::PrivateLabelRow> = s.private_labels.iter().map(|pl| {
+        let status_str = match pl.status {
+            PrivateLabelStatus::Developing => "Developing".to_string(),
+            PrivateLabelStatus::Active => "Active".to_string(),
+            PrivateLabelStatus::Discontinued => "Discontinued".to_string(),
+        };
+        let status_class = match pl.status {
+            PrivateLabelStatus::Developing => "text-yellow-400".to_string(),
+            PrivateLabelStatus::Active => "text-green-400".to_string(),
+            PrivateLabelStatus::Discontinued => "text-red-400".to_string(),
+        };
+        let bp_class = if pl.brand_power >= 60.0 { "text-green-400".to_string() }
+            else if pl.brand_power >= 35.0 { "text-yellow-400".to_string() }
+            else { "text-red-400".to_string() };
+        let cat_name = private_label::find_config(&pl.category_id).map(|c| c.category_name).unwrap_or_else(|| pl.category_id.clone());
+        crate::api::dto::PrivateLabelRow {
+            id: pl.id.clone(),
+            brand_name: pl.brand_name.clone(),
+            category: cat_name,
+            status: status_str,
+            status_class,
+            development_progress: format!("{:.0}%", pl.development_progress),
+            quarters_remaining: pl.quarters_remaining,
+            brand_power: format!("{:.0}/100", pl.brand_power),
+            brand_power_class: bp_class,
+            margin_rate: format!("{:.0}%", pl.margin_rate * 100.0),
+            quarterly_revenue: if pl.quarterly_revenue > 0.0 { format_currency(pl.quarterly_revenue) } else { "-".into() },
+            total_revenue: format_currency(pl.total_revenue),
+            quarterly_cost: format_currency(pl.quarterly_marketing_cost),
+        }
+    }).collect();
+
+    let active_cats: std::collections::HashSet<String> = s.private_labels.iter()
+        .filter(|pl| pl.status != PrivateLabelStatus::Discontinued)
+        .map(|pl| pl.category_id.clone())
+        .collect();
+
+    let category_options: Vec<crate::api::dto::PrivateLabelCategoryOption> = private_label::get_category_configs().iter().map(|cfg| {
+        let taken = active_cats.contains(&cfg.category_id);
+        let can_afford = s.company.cash >= cfg.development_cost;
+        let (can_start, reason, show_reason) = if taken {
+            (false, "Already developed".into(), true)
+        } else if !can_afford {
+            (false, format!("Need {}", format_currency(cfg.development_cost)), true)
+        } else {
+            (true, String::new(), false)
+        };
+        crate::api::dto::PrivateLabelCategoryOption {
+            category_id: cfg.category_id.clone(),
+            category_name: cfg.category_name.clone(),
+            development_cost: format_currency(cfg.development_cost),
+            development_quarters: cfg.development_quarters,
+            base_margin: format!("{:.0}%", cfg.base_margin * 100.0),
+            quarterly_cost: format_currency(cfg.quarterly_marketing_cost),
+            can_start,
+            reason,
+            show_reason,
+        }
+    }).collect();
+
+    let active_count = s.private_labels.iter().filter(|pl| pl.status == PrivateLabelStatus::Active).count();
+    let developing_count = s.private_labels.iter().filter(|pl| pl.status == PrivateLabelStatus::Developing).count();
+    let total_qr: f64 = s.private_labels.iter().filter(|pl| pl.status == PrivateLabelStatus::Active).map(|pl| pl.quarterly_revenue).sum();
+    let total_tr: f64 = s.private_labels.iter().map(|pl| pl.total_revenue).sum();
+    let total_qc: f64 = s.private_labels.iter().filter(|pl| pl.status == PrivateLabelStatus::Active).map(|pl| pl.quarterly_marketing_cost).sum();
+
+    let cmo_skill = s.executives.iter().find(|e| e.position == ExecutivePosition::CMO).map(|e| format!("{:.0}/100", e.skill)).unwrap_or_else(|| "Not hired".into());
+
+    crate::templates::PrivateLabelTemplate {
+        brand_rows,
+        category_options,
+        active_count,
+        developing_count,
+        total_quarterly_revenue: format_currency(total_qr),
+        total_pl_revenue: format_currency(total_tr),
+        total_quarterly_cost: format_currency(total_qc),
+        cmo_skill,
+        cash: format_currency_full(s.company.cash),
+        messages: s.messages_vec(),
+        current_quarter: s.current_quarter_label(),
+        active_page: "private_label".to_string(),
+    }.into_response()
+}
+
+pub async fn start_private_label(State(state): State<AppState>, Form(form): Form<super::dto::PrivateLabelForm>) -> Response {
+    let mut state = state.lock().await;
+    match private_label::start_development(&mut state, &form.category_id) {
+        Ok(_cost) => {}
+        Err(msg) => {
+            state.push_message(msg.to_string());
+        }
+    }
+    Redirect::to("/private-label").into_response()
 }

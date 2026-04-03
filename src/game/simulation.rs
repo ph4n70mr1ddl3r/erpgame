@@ -13,6 +13,7 @@ use super::products::{
     total_product_margin_modifier, total_product_revenue_modifier, update_product_categories,
 };
 use super::state::*;
+use super::supply_chain::process_supply_chain;
 use super::upgrades::{
     get_store_cost_modifier, get_store_revenue_modifier, get_store_satisfaction_modifier,
 };
@@ -74,6 +75,7 @@ pub fn simulate_quarter(state: &mut GameState) {
 
     let total_revenue = calculate_revenue(state, &mut rng, cfo_skill, coo_skill);
     let ecommerce_cost = process_ecommerce(state);
+    let supply_chain_cost = process_supply_chain(state);
     let online_revenue = state.ecommerce.quarterly_online_revenue;
     let total_revenue = total_revenue + online_revenue;
     let total_expenses = calculate_expenses(state, operating_count, cto_skill);
@@ -88,7 +90,8 @@ pub fn simulate_quarter(state: &mut GameState) {
     update_company_metrics(state, &mut rng);
 
     let operating_count = state.operating_store_count();
-    let all_expenses = total_expenses + hiring_costs + loyalty_cost + ecommerce_cost;
+    let all_expenses =
+        total_expenses + hiring_costs + loyalty_cost + ecommerce_cost + supply_chain_cost;
     let board_game_over = update_board(
         &mut state.board,
         total_revenue,
@@ -531,6 +534,7 @@ fn calculate_expenses(state: &mut GameState, operating_count: u32, cto_skill: Op
         };
     let cto_cost_reduction = 1.0 - cto_skill.unwrap_or(0.0) * 0.001;
     let product_cost_factor = 1.0 + (1.0 - total_product_margin_modifier(&state.products)) * 0.3;
+    let sc_cost_modifier = super::supply_chain::supply_chain_cost_modifier(state);
     let mut total_expenses = 0.0;
     let cities = get_available_cities();
     let non_closed_count = state
@@ -580,6 +584,7 @@ fn calculate_expenses(state: &mut GameState, operating_count: u32, cto_skill: Op
                     InventoryPolicy::Abundant => 0.60,
                 }
                 * product_cost_factor
+                * sc_cost_modifier
         } else {
             0.0
         };

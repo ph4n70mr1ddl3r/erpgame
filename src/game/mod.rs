@@ -10,6 +10,7 @@ pub mod loyalty;
 pub mod products;
 pub mod simulation;
 pub mod state;
+pub mod supply_chain;
 pub mod upgrades;
 
 pub use simulation::*;

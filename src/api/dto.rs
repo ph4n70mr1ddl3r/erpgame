@@ -343,3 +343,72 @@ pub struct EcommerceLevelRow {
     pub show_reason: bool,
     pub reason: String,
 }
+
+#[derive(Debug, Serialize)]
+pub struct SupplierRow {
+    pub id: String,
+    pub name: String,
+    pub category: String,
+    pub region: String,
+    pub reliability: String,
+    pub cost_modifier: String,
+    pub lead_time: i32,
+    pub quarters_remaining: i32,
+    pub relationship: String,
+    pub relationship_class: String,
+    pub is_active: bool,
+}
+
+#[derive(Debug, Serialize)]
+pub struct SupplierCategoryOption {
+    pub key: String,
+    pub name: String,
+    pub can_negotiate: bool,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct NegotiateSupplierForm {
+    pub category: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct LogisticsLevelRow {
+    pub key: String,
+    pub name: String,
+    pub description: String,
+    pub quarterly_cost: String,
+    pub cost_reduction: String,
+    pub reliability: String,
+    pub stockout_reduction: String,
+    pub min_stores: u32,
+    pub is_current: bool,
+    pub can_select: bool,
+    pub show_reason: bool,
+    pub reason: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct LogisticsForm {
+    pub level: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct WarehouseTierRow {
+    pub key: String,
+    pub name: String,
+    pub description: String,
+    pub setup_cost: String,
+    pub quarterly_cost: String,
+    pub bulk_discount: String,
+    pub stockout_reduction: String,
+    pub min_stores: u32,
+    pub is_current: bool,
+    pub can_select: bool,
+    pub show_reason: bool,
+    pub reason: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct WarehouseForm {
+    pub tier: String,
+}

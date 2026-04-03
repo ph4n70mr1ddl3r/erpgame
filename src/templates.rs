@@ -237,3 +237,28 @@ pub struct EcommerceTemplate {
     pub current_quarter: String,
     pub active_page: String,
 }
+
+#[derive(Template)]
+#[template(path = "supply_chain.html")]
+pub struct SupplyChainTemplate {
+    pub supplier_rows: Vec<crate::api::dto::SupplierRow>,
+    pub category_options: Vec<crate::api::dto::SupplierCategoryOption>,
+    pub active_supplier_count: usize,
+    pub max_suppliers: usize,
+    pub logistics_levels: Vec<crate::api::dto::LogisticsLevelRow>,
+    pub warehouse_tiers: Vec<crate::api::dto::WarehouseTierRow>,
+    pub stockout_rate: String,
+    pub avg_delivery_time: String,
+    #[allow(dead_code)]
+    pub quarterly_logistics_cost: String,
+    #[allow(dead_code)]
+    pub total_quarterly_cost: String,
+    pub total_supply_savings: String,
+    pub last_stockout_penalty: String,
+    pub quarters_since_disruption: i32,
+    pub csco_skill: String,
+    pub cash: String,
+    pub messages: Vec<String>,
+    pub current_quarter: String,
+    pub active_page: String,
+}

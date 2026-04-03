@@ -1,0 +1,187 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1 style="font-size: 1.5rem; font-weight: 700; margin-bottom: 0.25rem;">Supply Chain Management</h1>
+<p style="color: #64748b; margin-bottom: 1rem;">Manage suppliers, logistics, and warehouses to reduce costs and prevent stockouts. Your CSCO's skill improves negotiations and supply reliability.</p>
+
+{% if messages.len() > 0 %}
+<div style="margin-bottom: 1rem;">
+    {% for msg in messages %}
+    <div class="message msg-info">{{ msg }}</div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+    <div class="stat-card">
+        <div style="font-size: 0.75rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em;">Active Suppliers</div>
+        <div style="font-size: 1.5rem; font-weight: 700; margin-top: 0.25rem;">{{ active_supplier_count }}/{{ max_suppliers }}</div>
+    </div>
+    <div class="stat-card">
+        <div style="font-size: 0.75rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em;">Stockout Rate</div>
+        <div style="font-size: 1.5rem; font-weight: 700; margin-top: 0.25rem; color: #f59e0b;">{{ stockout_rate }}</div>
+    </div>
+    <div class="stat-card">
+        <div style="font-size: 0.75rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em;">Avg. Delivery Time</div>
+        <div style="font-size: 1.5rem; font-weight: 700; margin-top: 0.25rem;">{{ avg_delivery_time }}</div>
+    </div>
+    <div class="stat-card">
+        <div style="font-size: 0.75rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em;">Quarterly SC Cost</div>
+        <div style="font-size: 1.5rem; font-weight: 700; margin-top: 0.25rem; color: #f59e0b;">{{ total_quarterly_cost }}</div>
+    </div>
+    <div class="stat-card">
+        <div style="font-size: 0.75rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em;">Supply Savings (Last Q)</div>
+        <div style="font-size: 1.5rem; font-weight: 700; margin-top: 0.25rem; color: #22c55e;">{{ total_supply_savings }}</div>
+    </div>
+    <div class="stat-card">
+        <div style="font-size: 0.75rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em;">Stockout Penalty (Last Q)</div>
+        <div style="font-size: 1.5rem; font-weight: 700; margin-top: 0.25rem; color: #ef4444;">{{ last_stockout_penalty }}</div>
+    </div>
+    <div class="stat-card">
+        <div style="font-size: 0.75rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em;">Q Since Disruption</div>
+        <div style="font-size: 1.5rem; font-weight: 700; margin-top: 0.25rem;">{{ quarters_since_disruption }}</div>
+    </div>
+    <div class="stat-card">
+        <div style="font-size: 0.75rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em;">CSCO Skill</div>
+        <div style="font-size: 1.5rem; font-weight: 700; margin-top: 0.25rem;">{{ csco_skill }}</div>
+        <div style="font-size: 0.7rem; color: #64748b; margin-top: 0.15rem;">Boosts supplier reliability</div>
+    </div>
+</div>
+
+<h2 style="font-size: 1.1rem; font-weight: 600; margin-bottom: 0.75rem;">Supplier Contracts</h2>
+
+{% if supplier_rows.len() > 0 %}
+<div class="card" style="overflow-x: auto; margin-bottom: 1.5rem;">
+    <table>
+        <thead>
+            <tr>
+                <th>Supplier</th>
+                <th>Category</th>
+                <th>Region</th>
+                <th>Reliability</th>
+                <th>Cost</th>
+                <th>Lead</th>
+                <th>Remaining</th>
+                <th>Relationship</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for sup in supplier_rows %}
+            <tr>
+                <td>
+                    <div style="font-weight: 600;">{{ sup.name }}</div>
+                    {% if !sup.is_active %}<span style="font-size: 0.7rem; color: #ef4444;">EXPIRED</span>{% endif %}
+                </td>
+                <td>{{ sup.category }}</td>
+                <td>{{ sup.region }}</td>
+                <td>{{ sup.reliability }}</td>
+                <td>{{ sup.cost_modifier }}</td>
+                <td>{{ sup.lead_time }}Q</td>
+                <td>{{ sup.quarters_remaining }}Q</td>
+                <td class="{{ sup.relationship_class }}">{{ sup.relationship }}</td>
+                <td>
+                    {% if sup.is_active %}
+                    <form action="/supply-chain/suppliers/{{ sup.id }}/terminate" method="POST" style="margin: 0;">
+                        <button type="submit" class="btn-danger btn-sm">Terminate</button>
+                    </form>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="card" style="padding: 1.5rem; margin-bottom: 1.5rem; text-align: center; color: #64748b;">
+    No supplier contracts yet. Negotiate with suppliers below to reduce costs and improve reliability.
+</div>
+{% endif %}
+
+{% if active_supplier_count < max_suppliers %}
+<h3 style="font-size: 1rem; font-weight: 600; margin-bottom: 0.5rem;">Negotiate New Supplier (Cost: P500K)</h3>
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0.75rem; margin-bottom: 1.5rem;">
+    {% for cat in category_options %}
+    {% if cat.can_negotiate %}
+    <form action="/supply-chain/negotiate" method="POST" style="margin: 0;">
+        <input type="hidden" name="category" value="{{ cat.key }}">
+        <button type="submit" class="btn-primary" style="width: 100%; padding: 0.75rem;">+ {{ cat.name }}</button>
+    </form>
+    {% else %}
+    <div style="background: #1e293b; border: 1px solid #334155; border-radius: 0.5rem; padding: 0.75rem; text-align: center; color: #475569; font-size: 0.85rem;">
+        {{ cat.name }} {% if active_supplier_count >= max_suppliers %}(max reached){% else %}(need P500K){% endif %}
+    </div>
+    {% endif %}
+    {% endfor %}
+</div>
+{% endif %}
+
+<h2 style="font-size: 1.1rem; font-weight: 600; margin-bottom: 0.75rem;">Logistics Network</h2>
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+    {% for level in logistics_levels %}
+    <div class="card" style="padding: 1rem; {% if level.is_current %}border-left: 4px solid #3b82f6;{% endif %}">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+            <h3 style="font-size: 1rem; font-weight: 600;">{{ level.name }}</h3>
+            {% if level.is_current %}
+            <span style="font-size: 0.7rem; background: #3b82f6; color: white; padding: 0.15rem 0.5rem; border-radius: 0.25rem; font-weight: 600;">CURRENT</span>
+            {% endif %}
+        </div>
+        <p style="font-size: 0.8rem; color: #94a3b8; margin-bottom: 0.75rem;">{{ level.description }}</p>
+        <div style="font-size: 0.8rem; color: #64748b; margin-bottom: 0.5rem;">
+            <div>Quarterly Cost: <span style="color: #f59e0b;">{{ level.quarterly_cost }}</span></div>
+            <div>Cost Reduction: <span style="color: #22c55e;">{{ level.cost_reduction }}</span></div>
+            <div>Delivery Reliability: <span style="color: #e2e8f0;">{{ level.reliability }}</span></div>
+            <div>Stockout Reduction: <span style="color: #22c55e;">{{ level.stockout_reduction }}</span></div>
+            {% if level.min_stores > 0 %}
+            <div>Min. Stores: <span style="color: #e2e8f0;">{{ level.min_stores }}</span></div>
+            {% endif %}
+        </div>
+        {% if level.can_select && !level.is_current %}
+        <form action="/supply-chain/logistics" method="POST" style="margin-top: 0.5rem;">
+            <input type="hidden" name="level" value="{{ level.key }}">
+            <button type="submit" class="btn-primary btn-sm" style="width: 100%;">{% if level.key == "basic" %}Downgrade{% else %}Upgrade to {{ level.name }}{% endif %}</button>
+        </form>
+        {% else if level.show_reason %}
+        <div style="font-size: 0.75rem; color: #ef4444; margin-top: 0.5rem; text-align: center;">{{ level.reason }}</div>
+        {% endif %}
+    </div>
+    {% endfor %}
+</div>
+
+<h2 style="font-size: 1.1rem; font-weight: 600; margin-bottom: 0.75rem;">Warehouse & Distribution</h2>
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+    {% for tier in warehouse_tiers %}
+    <div class="card" style="padding: 1rem; {% if tier.is_current %}border-left: 4px solid #a78bfa;{% endif %}">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+            <h3 style="font-size: 1rem; font-weight: 600; color: {% if tier.is_current %}#a78bfa{% else %}#e2e8f0{% endif %};">{{ tier.name }}</h3>
+            {% if tier.is_current %}
+            <span style="font-size: 0.7rem; background: #a78bfa; color: white; padding: 0.15rem 0.5rem; border-radius: 0.25rem; font-weight: 600;">CURRENT</span>
+            {% endif %}
+        </div>
+        <p style="font-size: 0.8rem; color: #94a3b8; margin-bottom: 0.75rem;">{{ tier.description }}</p>
+        <div style="font-size: 0.8rem; color: #64748b; margin-bottom: 0.5rem;">
+            <div>Setup Cost: <span style="color: #e2e8f0;">{{ tier.setup_cost }}</span></div>
+            <div>Quarterly Cost: <span style="color: #f59e0b;">{{ tier.quarterly_cost }}</span></div>
+            <div>Bulk Discount: <span style="color: #22c55e;">{{ tier.bulk_discount }}</span></div>
+            <div>Stockout Reduction: <span style="color: #22c55e;">{{ tier.stockout_reduction }}</span></div>
+            {% if tier.min_stores > 0 %}
+            <div>Min. Stores: <span style="color: #e2e8f0;">{{ tier.min_stores }}</span></div>
+            {% endif %}
+        </div>
+        {% if tier.can_select && !tier.is_current %}
+        <form action="/supply-chain/warehouse" method="POST" style="margin-top: 0.5rem;">
+            <input type="hidden" name="tier" value="{{ tier.key }}">
+            <button type="submit" class="btn-primary btn-sm" style="width: 100%;">{% if tier.key == "none" %}Decommission{% else %}Build {{ tier.name }}{% endif %}</button>
+        </form>
+        {% else if tier.show_reason %}
+        <div style="font-size: 0.75rem; color: #ef4444; margin-top: 0.5rem; text-align: center;">{{ tier.reason }}</div>
+        {% endif %}
+    </div>
+    {% endfor %}
+</div>
+
+<div style="margin-top: 1.5rem; text-align: center; font-size: 0.8rem; color: #64748b;">
+    Cash on hand: <span style="color: #e2e8f0;">{{ cash }}</span>
+</div>
+
+{% endblock %}

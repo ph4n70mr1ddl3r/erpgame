@@ -47,6 +47,11 @@ async fn main() {
         .route("/campaigns/launch", post(api::routes::launch_campaign_route))
         .route("/ecommerce", get(api::routes::ecommerce_page))
         .route("/ecommerce", post(api::routes::upgrade_ecommerce_route))
+        .route("/supply-chain", get(api::routes::supply_chain_page))
+        .route("/supply-chain/negotiate", post(api::routes::negotiate_supplier_route))
+        .route("/supply-chain/suppliers/{id}/terminate", post(api::routes::terminate_supplier_route))
+        .route("/supply-chain/logistics", post(api::routes::upgrade_logistics_route))
+        .route("/supply-chain/warehouse", post(api::routes::upgrade_warehouse_route))
         .route("/achievements", get(api::routes::achievements_page))
         .with_state(game_state)
         .nest_service("/static", ServeDir::new("static"));

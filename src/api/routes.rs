@@ -17,6 +17,11 @@ use crate::game::{
     ecommerce::{EcommerceLevel, upgrade_ecommerce},
     loyalty::{LoyaltyTier, loyalty_revenue_multiplier},
     products::invest_in_category, upgrades::purchase_upgrade as do_purchase_upgrade,
+    supply_chain::{
+        SupplierCategory, LogisticsLevel, WarehouseTier,
+        available_supplier_categories, negotiate_supplier, terminate_supplier,
+        upgrade_logistics, upgrade_warehouse,
+    },
 };
 use super::dto::*;
 
@@ -1009,4 +1014,214 @@ pub async fn upgrade_ecommerce_route(State(state): State<AppState>, Form(form): 
         }
     }
     Redirect::to("/ecommerce").into_response()
+}
+
+pub async fn supply_chain_page(State(state): State<AppState>) -> Response {
+    let state = state.lock().await;
+    let s = &*state;
+    let sc = &s.supply_chain;
+
+    let supplier_rows: Vec<SupplierRow> = sc.suppliers.iter().map(|sup| {
+        let rel = sup.relationship_score;
+        let rel_class = if rel >= 75.0 { "text-green-400".to_string() }
+            else if rel >= 50.0 { "text-yellow-400".to_string() }
+            else { "text-red-400".to_string() };
+        SupplierRow {
+            id: sup.id.clone(),
+            name: sup.name.clone(),
+            category: sup.category.label().to_string(),
+            region: format!("{:?}", sup.region),
+            reliability: format!("{:.0}%", sup.reliability),
+            cost_modifier: format!("{:.0}%", sup.effective_cost_modifier() * 100.0),
+            lead_time: sup.lead_time_quarters,
+            quarters_remaining: sup.quarters_remaining,
+            relationship: format!("{:.0}%", rel),
+            relationship_class: rel_class,
+            is_active: sup.is_active,
+        }
+    }).collect();
+
+    let active_count = sc.suppliers.iter().filter(|s| s.is_active).count();
+    let available_cats = available_supplier_categories(s);
+    let category_options: Vec<SupplierCategoryOption> = SupplierCategory::all_categories().iter().map(|c| {
+        let available = available_cats.iter().any(|ac| *ac == *c);
+        let can = available && active_count < 8 && s.company.cash >= 500_000.0;
+        SupplierCategoryOption {
+            key: c.key().to_string(),
+            name: c.label().to_string(),
+            can_negotiate: can,
+        }
+    }).collect();
+
+    let csco_skill = s.executives.iter().find(|e| e.position == ExecutivePosition::CSCO).map(|e| format!("{:.0}/100", e.skill)).unwrap_or_else(|| "Not hired".into());
+
+    let logistics_levels: Vec<LogisticsLevelRow> = LogisticsLevel::all_levels().iter().map(|l| {
+        let is_current = *l == sc.logistics;
+        let can_afford = s.company.cash >= match *l {
+            LogisticsLevel::Basic => 0.0,
+            LogisticsLevel::Regional => 8_000_000.0,
+            LogisticsLevel::National => 20_000_000.0,
+            LogisticsLevel::Advanced => 50_000_000.0,
+        };
+        let has_stores = s.operating_store_count() >= l.min_stores();
+        let current_ord = sc.logistics as u8;
+        let new_ord = *l as u8;
+        let is_next = new_ord == current_ord + 1;
+        let (can_select, reason, show_reason) = if is_current {
+            (false, String::new(), false)
+        } else if *l == LogisticsLevel::Basic && sc.logistics != LogisticsLevel::Basic {
+            (true, String::new(), false)
+        } else if !has_stores {
+            (false, format!("Need {} stores", l.min_stores()), true)
+        } else if !can_afford {
+            (false, format!("Need {}", format_currency(match *l {
+                LogisticsLevel::Basic => 0.0,
+                LogisticsLevel::Regional => 8_000_000.0,
+                LogisticsLevel::National => 20_000_000.0,
+                LogisticsLevel::Advanced => 50_000_000.0,
+            })), true)
+        } else if !is_next && *l != LogisticsLevel::Basic {
+            (false, "Upgrade one level at a time".into(), true)
+        } else {
+            (true, String::new(), false)
+        };
+        LogisticsLevelRow {
+            key: l.key().to_string(),
+            name: l.label().to_string(),
+            description: l.description().to_string(),
+            quarterly_cost: if l.quarterly_cost() > 0.0 { format_currency(l.quarterly_cost()) } else { "-".into() },
+            cost_reduction: format!("-{:.0}%", l.cost_reduction_pct() * 100.0),
+            reliability: format!("{:.0}%", l.delivery_reliability() * 100.0),
+            stockout_reduction: format!("-{:.0}%", l.stockout_reduction() * 100.0),
+            min_stores: l.min_stores(),
+            is_current,
+            can_select,
+            show_reason,
+            reason,
+        }
+    }).collect();
+
+    let warehouse_tiers: Vec<WarehouseTierRow> = WarehouseTier::all_tiers().iter().map(|t| {
+        let is_current = *t == sc.warehouse;
+        let can_afford = s.company.cash >= t.setup_cost();
+        let has_stores = s.operating_store_count() >= t.min_stores();
+        let current_ord = sc.warehouse as u8;
+        let new_ord = *t as u8;
+        let is_next = new_ord == current_ord + 1;
+        let (can_select, reason, show_reason) = if is_current {
+            (false, String::new(), false)
+        } else if *t == WarehouseTier::None && sc.warehouse != WarehouseTier::None {
+            (true, String::new(), false)
+        } else if !has_stores {
+            (false, format!("Need {} stores", t.min_stores()), true)
+        } else if !can_afford {
+            (false, format!("Need {}", format_currency(t.setup_cost())), true)
+        } else if !is_next && *t != WarehouseTier::None {
+            (false, "Upgrade one tier at a time".into(), true)
+        } else {
+            (true, String::new(), false)
+        };
+        WarehouseTierRow {
+            key: t.key().to_string(),
+            name: t.label().to_string(),
+            description: t.description().to_string(),
+            setup_cost: if t.setup_cost() > 0.0 { format_currency(t.setup_cost()) } else { "Free".into() },
+            quarterly_cost: if t.quarterly_cost() > 0.0 { format_currency(t.quarterly_cost()) } else { "-".into() },
+            bulk_discount: format!("-{:.0}%", t.bulk_discount_pct() * 100.0),
+            stockout_reduction: format!("-{:.0}%", t.stockout_reduction() * 100.0),
+            min_stores: t.min_stores(),
+            is_current,
+            can_select,
+            show_reason,
+            reason,
+        }
+    }).collect();
+
+    let total_quarterly_cost = sc.logistics.quarterly_cost() + sc.warehouse.quarterly_cost();
+
+    crate::templates::SupplyChainTemplate {
+        supplier_rows,
+        category_options,
+        active_supplier_count: active_count,
+        max_suppliers: 8,
+        logistics_levels,
+        warehouse_tiers,
+        stockout_rate: format!("{:.1}%", sc.stockout_rate),
+        avg_delivery_time: format!("{:.1} Q", sc.avg_delivery_time),
+        quarterly_logistics_cost: format_currency(sc.quarterly_logistics_cost),
+        total_quarterly_cost: format_currency(total_quarterly_cost),
+        total_supply_savings: format_currency(sc.total_supply_savings),
+        last_stockout_penalty: if sc.last_stockout_penalty > 0.0 { format_currency(sc.last_stockout_penalty) } else { "-".into() },
+        quarters_since_disruption: sc.quarters_since_disruption,
+        csco_skill,
+        cash: format_currency_full(s.company.cash),
+        messages: s.messages_vec(),
+        current_quarter: s.current_quarter_label(),
+        active_page: "supply_chain".to_string(),
+    }.into_response()
+}
+
+pub async fn negotiate_supplier_route(State(state): State<AppState>, Form(form): Form<NegotiateSupplierForm>) -> Response {
+    let mut state = state.lock().await;
+    let category = match SupplierCategory::from_key(&form.category) {
+        Some(c) => c,
+        None => {
+            state.push_message("Invalid supplier category.".into());
+            return Redirect::to("/supply-chain").into_response();
+        }
+    };
+    match negotiate_supplier(&mut state, category) {
+        Ok(_) => {}
+        Err(msg) => {
+            state.push_message(msg.to_string());
+        }
+    }
+    Redirect::to("/supply-chain").into_response()
+}
+
+pub async fn terminate_supplier_route(State(state): State<AppState>, Path(id): Path<String>) -> Response {
+    let mut state = state.lock().await;
+    match terminate_supplier(&mut state, &id) {
+        Ok(_) => {}
+        Err(msg) => {
+            state.push_message(msg.to_string());
+        }
+    }
+    Redirect::to("/supply-chain").into_response()
+}
+
+pub async fn upgrade_logistics_route(State(state): State<AppState>, Form(form): Form<LogisticsForm>) -> Response {
+    let mut state = state.lock().await;
+    let new_level = match LogisticsLevel::from_key(&form.level) {
+        Some(l) => l,
+        None => {
+            state.push_message("Invalid logistics level.".into());
+            return Redirect::to("/supply-chain").into_response();
+        }
+    };
+    match upgrade_logistics(&mut state, new_level) {
+        Ok(_) => {}
+        Err(msg) => {
+            state.push_message(msg.to_string());
+        }
+    }
+    Redirect::to("/supply-chain").into_response()
+}
+
+pub async fn upgrade_warehouse_route(State(state): State<AppState>, Form(form): Form<WarehouseForm>) -> Response {
+    let mut state = state.lock().await;
+    let new_tier = match WarehouseTier::from_key(&form.tier) {
+        Some(t) => t,
+        None => {
+            state.push_message("Invalid warehouse tier.".into());
+            return Redirect::to("/supply-chain").into_response();
+        }
+    };
+    match upgrade_warehouse(&mut state, new_tier) {
+        Ok(_) => {}
+        Err(msg) => {
+            state.push_message(msg.to_string());
+        }
+    }
+    Redirect::to("/supply-chain").into_response()
 }

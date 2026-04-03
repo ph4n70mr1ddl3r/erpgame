@@ -26,6 +26,9 @@ fn find_exec_skill(state: &GameState, position: ExecutivePosition) -> Option<f64
 }
 
 pub fn simulate_quarter(state: &mut GameState) {
+    if state.game_over {
+        return;
+    }
     state.messages.clear();
     state.current_quarter += 1;
     if state.current_quarter > 4 {
@@ -69,16 +72,15 @@ pub fn simulate_quarter(state: &mut GameState) {
     let operating_count = state.operating_store_count();
     let cfo_skill = find_exec_skill(state, ExecutivePosition::CFO);
     let coo_skill = find_exec_skill(state, ExecutivePosition::COO);
-    let cmo_skill = find_exec_skill(state, ExecutivePosition::CMO);
     let cto_skill = find_exec_skill(state, ExecutivePosition::CTO);
 
-    let total_revenue = calculate_revenue(state, &mut rng, cfo_skill, coo_skill, cmo_skill);
+    let total_revenue = calculate_revenue(state, &mut rng, cfo_skill, coo_skill);
     let online_revenue = state.ecommerce.quarterly_online_revenue;
     let total_revenue = total_revenue + online_revenue;
     let total_expenses = calculate_expenses(state, operating_count, cto_skill);
     let loyalty_cost = update_loyalty(state);
     let ecommerce_cost = process_ecommerce(state);
-    let _campaign_rev_mult = process_campaigns(state);
+    let _ = process_campaigns(state);
     let loan_payments = process_loans(state);
     let event_impacts = process_random_events(state, &mut rng, total_revenue);
 
@@ -133,7 +135,7 @@ pub fn simulate_quarter(state: &mut GameState) {
         quarter,
         year: state.current_year,
         revenue: total_revenue,
-        expenses: total_expenses + hiring_costs,
+        expenses: total_expenses + hiring_costs + loyalty_cost + ecommerce_cost,
         profit: final_profit,
         tax_paid: tax,
         cash_flow: final_profit,
@@ -303,8 +305,8 @@ fn update_economy(state: &mut GameState, rng: &mut rand::rngs::ThreadRng) {
 
     if state.current_quarter == 1 {
         let wage_increase = rng.gen_range(10.0..30.0);
-        e.minimum_wage_daily += wage_increase;
-        state.messages.push(format!(
+        e.minimum_wage_daily = (e.minimum_wage_daily + wage_increase).clamp(450.0, 900.0);
+        state.messages.push_back(format!(
             "Government raised minimum wage to P{:.0}/day",
             e.minimum_wage_daily
         ));
@@ -327,11 +329,13 @@ fn process_store_construction(state: &mut GameState) {
             store.construction_quarters_left -= 1;
             if store.construction_quarters_left <= 0 {
                 store.status = StoreStatus::Operating;
+                store.age_quarters = 0;
                 store.opened_quarter = state.current_quarter;
                 store.opened_year = state.current_year;
                 state
                     .messages
-                    .push(format!("{} in {} is now OPEN!", store.name, store.city));
+                    .push_back(format!("{} in {} is now OPEN!", store.name, store.city));
+                continue;
             }
         }
         if store.status == StoreStatus::Operating {
@@ -345,7 +349,6 @@ fn calculate_revenue(
     rng: &mut rand::rngs::ThreadRng,
     cfo_skill: Option<f64>,
     coo_skill: Option<f64>,
-    cmo_skill: Option<f64>,
 ) -> f64 {
     let economy_mult = 1.0 + (state.economy.gdp_growth_rate - 4.0) / 100.0;
     let construction_mult = 1.0 + (state.economy.construction_index - 60.0) / 200.0;
@@ -386,7 +389,6 @@ fn calculate_revenue(
 
     let cfo_bonus = 1.0 + cfo_skill.unwrap_or(0.0) * 0.002;
     let coo_bonus = 1.0 + coo_skill.unwrap_or(0.0) * 0.003;
-    let cmo_bonus = 1.0 + cmo_skill.unwrap_or(0.0) * 0.003;
 
     let product_rev_mult = total_product_revenue_modifier(&state.products);
 
@@ -463,7 +465,6 @@ fn calculate_revenue(
             * saturation
             * cfo_bonus
             * coo_bonus
-            * cmo_bonus
             * product_rev_mult
             * upgrade_rev_mult
             * expansion_mult
@@ -623,7 +624,12 @@ fn process_loans(state: &mut GameState) -> f64 {
 }
 
 fn process_executive_decisions(state: &mut GameState, rng: &mut rand::rngs::ThreadRng) {
-    let company_profitable = state.company.total_profit > 0.0;
+    let recent_profit = state
+        .financial_history
+        .last()
+        .map(|r| r.profit)
+        .unwrap_or(0.0);
+    let company_profitable = recent_profit > 0.0;
     let performance_delta = if company_profitable { 1.0 } else { -3.0 };
     let morale_delta = if company_profitable { 1.5 } else { -2.0 };
 
@@ -638,7 +644,7 @@ fn process_executive_decisions(state: &mut GameState, rng: &mut rand::rngs::Thre
         if exec.tenure_quarters % 4 == 0 {
             let raise = exec.salary_monthly * rng.gen_range(0.02..0.08);
             exec.salary_monthly += raise;
-            state.messages.push(format!(
+            state.messages.push_back(format!(
                 "{} got a raise to {}/month",
                 exec.name,
                 format_currency_full(exec.salary_monthly)
@@ -654,7 +660,7 @@ fn process_executive_decisions(state: &mut GameState, rng: &mut rand::rngs::Thre
             resigned.push((exec.name.clone(), exec.position.short_title().to_string()));
             false
         } else if exec.morale < 30.0 {
-            state.messages.push(format!(
+            state.messages.push_back(format!(
                 "{} ({}) is considering leaving due to low morale!",
                 exec.name,
                 exec.position.short_title()
@@ -666,7 +672,7 @@ fn process_executive_decisions(state: &mut GameState, rng: &mut rand::rngs::Thre
     });
 
     for (name, pos) in resigned {
-        state.messages.push(format!(
+        state.messages.push_back(format!(
             "[RESIGNED] {} ({}) has resigned due to low morale! Position is now vacant.",
             name, pos
         ));
@@ -696,11 +702,12 @@ fn update_employees(state: &mut GameState, rng: &mut rand::rngs::ThreadRng) -> f
         HrPolicy::Generous => 72.0,
         HrPolicy::Elite => 88.0,
     };
-    let performance_factor = if state.company.total_profit > 0.0 {
-        5.0
-    } else {
-        -5.0
-    };
+    let recent_profit = state
+        .financial_history
+        .last()
+        .map(|r| r.profit)
+        .unwrap_or(0.0);
+    let performance_factor = if recent_profit > 0.0 { 5.0 } else { -5.0 };
     let exec_bonus = state
         .executives
         .iter()

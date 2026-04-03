@@ -30,7 +30,7 @@ async fn main() {
         .route("/finances", get(api::routes::finances_page))
         .route("/finances/loan", post(api::routes::take_loan))
         .route("/events", get(api::routes::events_page))
-        .route("/new-game", get(api::routes::new_game))
+        .route("/new-game", post(api::routes::new_game))
         .route("/decisions", get(api::routes::decisions_page))
         .route("/decisions/resolve", post(api::routes::resolve_decision))
         .route("/delegation", get(api::routes::delegation_page))

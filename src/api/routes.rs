@@ -10,11 +10,11 @@ use rand::Rng;
 use crate::game::{
     CustomerServicePolicy, Executive, ExecutivePosition, ExpansionPolicy,
     EventCategory, GameState, HrPolicy, InventoryPolicy, Loan, MarketingPolicy, PricingPolicy,
-    Region, Store, StoreStatus, StoreType, UpgradeType, format_currency, format_currency_full,
+    Store, StoreStatus, StoreType, UpgradeType, format_currency, format_currency_full,
     generate_executive_name, get_available_cities, pct, simulate_quarter,
     achievements::unlocked_count, competitors::total_competitor_market_share,
     campaigns::{CampaignType, campaign_revenue_multiplier, launch_campaign},
-    ecommerce::{EcommerceLevel, upgrade_ecommerce, ecommerce_revenue_bonus},
+    ecommerce::{EcommerceLevel, upgrade_ecommerce},
     loyalty::{LoyaltyTier, loyalty_revenue_multiplier},
     products::invest_in_category, upgrades::purchase_upgrade as do_purchase_upgrade,
 };
@@ -62,7 +62,7 @@ pub async fn dashboard(State(state): State<AppState>) -> Response {
         current_quarter: s.advance_quarter_label(),
         next_quarter: next_q,
         game_over: s.game_over,
-        messages: s.messages.clone(),
+        messages: s.messages_vec(),
         financial_history,
         economy_gdp: pct(s.economy.gdp_growth_rate),
         economy_inflation: pct(s.economy.inflation_rate),
@@ -112,7 +112,7 @@ pub async fn stores_page(State(state): State<AppState>) -> Response {
         StoreTypeOption { key: "depot".into(), label: "Depot".into(), size: 18000, cost: format_currency(StoreType::Depot.opening_cost()), construction: StoreType::Depot.construction_quarters() },
     ];
 
-    crate::templates::StoresTemplate { store_rows, cities, store_types, cash: format_currency_full(s.company.cash), messages: s.messages.clone(), current_quarter: s.advance_quarter_label(), active_page: "stores".to_string() }.into_response()
+    crate::templates::StoresTemplate { store_rows, cities, store_types, cash: format_currency_full(s.company.cash), messages: s.messages_vec(), current_quarter: s.advance_quarter_label(), active_page: "stores".to_string() }.into_response()
 }
 
 pub async fn open_store(State(state): State<AppState>, Form(form): Form<NewStoreForm>) -> Response {
@@ -124,12 +124,19 @@ pub async fn open_store(State(state): State<AppState>, Form(form): Form<NewStore
             state.push_message(format!("Cannot open store: need {} but only have {}", format_currency(cost), format_currency(current_cash)));
         return Redirect::to("/stores").into_response();
     }
+    let store_name_raw = form.store_name.clone();
     let cities = get_available_cities();
-    let region = cities.iter().find(|c| c.name == form.city).map(|c| c.region).unwrap_or(Region::Luzon);
+    let (region, city_name) = match cities.iter().find(|c| c.name == form.city) {
+        Some(c) => (c.region, c.name.clone()),
+        None => {
+            state.push_message("Invalid city selected.".into());
+            return Redirect::to("/stores").into_response();
+        }
+    };
     state.company.cash -= cost;
-    let store_name = if form.store_name.is_empty() { format!("Bahay Depot {}", form.city) } else { form.store_name.clone() };
+    let store_name = if store_name_raw.is_empty() { format!("Bahay Depot {}", city_name) } else { store_name_raw.clone() };
     let store = Store {
-        id: uuid::Uuid::new_v4().to_string(), name: store_name, city: form.city.clone(), region, store_type,
+        id: uuid::Uuid::new_v4().to_string(), name: store_name, city: city_name, region, store_type,
         size_sqm: store_type.default_size(), status: StoreStatus::UnderConstruction, quarterly_revenue: 0.0,
         quarterly_expenses: 0.0, customer_count: 0, employee_count: 0, satisfaction: 50.0, age_quarters: 0,
         construction_quarters_left: store_type.construction_quarters(), opened_quarter: 0, opened_year: 0,
@@ -179,7 +186,7 @@ pub async fn executives_page(State(state): State<AppState>) -> Response {
     let mut open_positions = Vec::new();
     for pos in ExecutivePosition::all_positions() { if !s.is_executive_hired(pos) { open_positions.push(pos.title().to_string()); } }
 
-    crate::templates::ExecutivesTemplate { executives: exec_rows, open_positions, cash: format_currency_full(s.company.cash), messages: s.messages.clone(), current_quarter: s.advance_quarter_label(), active_page: "executives".to_string() }.into_response()
+    crate::templates::ExecutivesTemplate { executives: exec_rows, open_positions, cash: format_currency_full(s.company.cash), messages: s.messages_vec(), current_quarter: s.advance_quarter_label(), active_page: "executives".to_string() }.into_response()
 }
 
 pub async fn hire_executive(State(state): State<AppState>, Form(form): Form<HireExecutiveForm>) -> Response {
@@ -248,6 +255,8 @@ pub async fn fire_executive(State(state): State<AppState>, Path(id): Path<String
         state.executives.remove(idx);
         state.company.cash -= severance;
         state.push_message(format!("Fired {} ({}). Paid {} severance.", exec_name, exec_pos, format_currency(severance)));
+    } else {
+        state.push_message("Executive not found.".into());
     }
     Redirect::to("/executives").into_response()
 }
@@ -263,7 +272,7 @@ pub async fn policies_page(State(state): State<AppState>) -> Response {
         customer_service: p.customer_service.label().into(), customer_service_key: p.customer_service.key().into(),
         marketing: p.marketing.label().into(), marketing_key: p.marketing.key().into(),
         inventory: p.inventory.label().into(), inventory_key: p.inventory.key().into(),
-        messages: s.messages.clone(), current_quarter: s.advance_quarter_label(), active_page: "policies".to_string(),
+        messages: s.messages_vec(), current_quarter: s.advance_quarter_label(), active_page: "policies".to_string(),
     }.into_response()
 }
 
@@ -315,7 +324,7 @@ pub async fn finances_page(State(state): State<AppState>) -> Response {
         total_loans: format_currency(total_loan_remaining), tax_rate: pct(s.economy.corporate_tax_rate),
         interest_rate: pct(s.economy.interest_rate), financial_history, loans,
         max_loan: format_currency_full(max_loan), suggested_rate: format!("{:.1}", suggested_rate),
-        messages: s.messages.clone(), current_quarter: s.advance_quarter_label(), active_page: "finances".to_string(),
+        messages: s.messages_vec(), current_quarter: s.advance_quarter_label(), active_page: "finances".to_string(),
     }.into_response()
 }
 
@@ -354,7 +363,7 @@ pub async fn events_page(State(state): State<AppState>) -> Response {
     let state = state.lock().await;
     let s = &*state;
     let events: Vec<EventRow> = s.event_log.iter().take(30).map(|e| EventRow { title: e.title.clone(), icon: e.event_type.icon().into(), quarter: format!("Q{} {}", e.quarter, e.year) }).collect();
-    crate::templates::EventsTemplate { events, messages: s.messages.clone(), current_quarter: s.advance_quarter_label(), active_page: "events".to_string() }.into_response()
+    crate::templates::EventsTemplate { events, messages: s.messages_vec(), current_quarter: s.advance_quarter_label(), active_page: "events".to_string() }.into_response()
 }
 
 pub async fn decisions_page(State(state): State<AppState>) -> Response {
@@ -381,7 +390,7 @@ pub async fn decisions_page(State(state): State<AppState>) -> Response {
         pending_events: pending_rows,
         decisions_made: s.decisions_made,
         decisions_delegated: s.decisions_delegated,
-        messages: s.messages.clone(),
+        messages: s.messages_vec(),
         current_quarter: s.advance_quarter_label(),
         active_page: "decisions".to_string(),
     }.into_response()
@@ -418,7 +427,7 @@ pub async fn delegation_page(State(state): State<AppState>) -> Response {
 
     crate::templates::DelegationTemplate {
         rows,
-        messages: s.messages.clone(),
+        messages: s.messages_vec(),
         current_quarter: s.advance_quarter_label(),
         active_page: "delegation".to_string(),
     }.into_response()
@@ -467,7 +476,10 @@ fn threshold_color(value: f64, good_threshold: f64, warn_threshold: f64, higher_
 }
 
 fn patience_color(value: f64) -> String {
-    threshold_color(value, 50.0, 30.0, true)
+    if value > 70.0 { "#22c55e".to_string() }
+    else if value > 50.0 { "#f59e0b".to_string() }
+    else if value > 30.0 { "#f97316".to_string() }
+    else { "#ef4444".to_string() }
 }
 
 fn pressure_color(value: f64) -> String {
@@ -522,7 +534,7 @@ pub async fn products_page(State(state): State<AppState>) -> Response {
     crate::templates::ProductsTemplate {
         rows, cash: format_currency_full(s.company.cash),
         total_invested: format_currency(total_invested),
-        messages: s.messages.clone(), current_quarter: s.advance_quarter_label(),
+        messages: s.messages_vec(), current_quarter: s.advance_quarter_label(),
         active_page: "products".to_string(),
     }.into_response()
 }
@@ -577,7 +589,7 @@ pub async fn upgrades_page(State(state): State<AppState>) -> Response {
 
     crate::templates::UpgradesTemplate {
         store_rows, cash: format_currency_full(s.company.cash),
-        messages: s.messages.clone(), current_quarter: s.advance_quarter_label(),
+        messages: s.messages_vec(), current_quarter: s.advance_quarter_label(),
         active_page: "upgrades".to_string(),
     }.into_response()
 }
@@ -610,7 +622,7 @@ pub async fn board_page(State(state): State<AppState>) -> Response {
     let state = state.lock().await;
     let s = &*state;
     let b = &s.board;
-    let quarters_until = 4 - b.quarters_since_review;
+    let quarters_until = (4 - b.quarters_since_review).max(0);
     crate::templates::BoardTemplate {
         board: crate::api::dto::BoardInfo {
             patience: format!("{:.0}%", b.patience), patience_class: b.patience_class().to_string(),
@@ -624,7 +636,7 @@ pub async fn board_page(State(state): State<AppState>) -> Response {
         company_value: format_currency(s.company.company_value),
         market_share: pct(s.company.market_share),
         competitor_share: pct(total_competitor_market_share(&s.competitors)),
-        messages: s.messages.clone(), current_quarter: s.advance_quarter_label(),
+        messages: s.messages_vec(), current_quarter: s.advance_quarter_label(),
         active_page: "board".to_string(),
     }.into_response()
 }
@@ -643,7 +655,7 @@ pub async fn competitors_page(State(state): State<AppState>) -> Response {
     }).collect();
     crate::templates::CompetitorsTemplate {
         rows, player_share: pct(s.company.market_share),
-        messages: s.messages.clone(), current_quarter: s.advance_quarter_label(),
+        messages: s.messages_vec(), current_quarter: s.advance_quarter_label(),
         active_page: "competitors".to_string(),
     }.into_response()
 }
@@ -661,7 +673,7 @@ pub async fn achievements_page(State(state): State<AppState>) -> Response {
     let unlocked = unlocked_count(&s.achievements);
     crate::templates::AchievementsTemplate {
         rows, total, unlocked,
-        messages: s.messages.clone(), current_quarter: s.advance_quarter_label(),
+        messages: s.messages_vec(), current_quarter: s.advance_quarter_label(),
         active_page: "achievements".to_string(),
     }.into_response()
 }
@@ -736,7 +748,7 @@ pub async fn loyalty_page(State(state): State<AppState>) -> Response {
         growth_rate: if current.member_growth_rate() > 0.0 { format!("{:.0}%/quarter", current.member_growth_rate() * 100.0) } else { "-".into() },
         tiers,
         cash: format_currency_full(s.company.cash),
-        messages: s.messages.clone(),
+        messages: s.messages_vec(),
         current_quarter: s.advance_quarter_label(),
         active_page: "loyalty".to_string(),
     }.into_response()
@@ -847,7 +859,7 @@ pub async fn campaigns_page(State(state): State<AppState>) -> Response {
         cmo_skill,
         active_count: s.campaigns.len(),
         cash: format_currency_full(s.company.cash),
-        messages: s.messages.clone(),
+        messages: s.messages_vec(),
         current_quarter: s.advance_quarter_label(),
         active_page: "campaigns".to_string(),
     }.into_response()
@@ -883,8 +895,11 @@ pub async fn ecommerce_page(State(state): State<AppState>) -> Response {
     let s = &*state;
     let current = s.ecommerce.level;
 
-    let effective_bonus = ecommerce_revenue_bonus(s);
-    let effective_pct = format!("{:.1}%", effective_bonus * 100.0);
+    let effective_pct = if current != EcommerceLevel::None {
+        format!("{:.1}%", current.revenue_bonus() * 100.0)
+    } else {
+        "-".into()
+    };
 
     let cto_skill = s.executives.iter().find(|e| e.position == ExecutivePosition::CTO).map(|e| format!("{:.0}/100", e.skill)).unwrap_or_else(|| "Not hired".into());
 
@@ -934,7 +949,7 @@ pub async fn ecommerce_page(State(state): State<AppState>) -> Response {
         cto_skill,
         levels,
         cash: format_currency_full(s.company.cash),
-        messages: s.messages.clone(),
+        messages: s.messages_vec(),
         current_quarter: s.advance_quarter_label(),
         active_page: "ecommerce".to_string(),
     }.into_response()

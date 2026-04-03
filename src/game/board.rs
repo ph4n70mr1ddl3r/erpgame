@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use std::collections::VecDeque;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BoardState {
@@ -72,7 +73,7 @@ pub fn update_board(
     store_count: u32,
     quarter: i32,
     year: i32,
-    messages: &mut Vec<String>,
+    messages: &mut VecDeque<String>,
 ) -> bool {
     board.quarters_since_review += 1;
 
@@ -83,8 +84,8 @@ pub fn update_board(
         board.last_review_year = year;
         board.quarters_since_review = 0;
 
-        let profit_margin = if quarterly_expenses > 0.0 {
-            (quarterly_revenue - quarterly_expenses) / quarterly_expenses * 100.0
+        let profit_margin = if quarterly_revenue > 0.0 {
+            (quarterly_revenue - quarterly_expenses) / quarterly_revenue * 100.0
         } else {
             0.0
         };
@@ -101,13 +102,13 @@ pub fn update_board(
             patience_delta -= 8.0;
         }
 
-        if profit_margin > 15.0 {
+        if profit_margin > 8.0 {
             patience_delta += 10.0;
-        } else if profit_margin > 5.0 {
+        } else if profit_margin > 3.0 {
             patience_delta += 5.0;
         } else if profit_margin > 0.0 {
             patience_delta += 1.0;
-        } else if profit_margin > -10.0 {
+        } else if profit_margin > -5.0 {
             patience_delta -= 8.0;
         } else {
             patience_delta -= 15.0;
@@ -128,7 +129,7 @@ pub fn update_board(
 
         if board.patience < 30.0 {
             board.warnings += 1;
-            messages.push(format!(
+            messages.push_back(format!(
                 "[BOARD] Annual Review Q4 {}: Board issued warning #{}. Patience at {:.0}%. {}",
                 year,
                 board.warnings,
@@ -136,12 +137,12 @@ pub fn update_board(
                 board.description()
             ));
         } else if board.patience < 50.0 {
-            messages.push(format!(
+            messages.push_back(format!(
                 "[BOARD] Annual Review Q4 {}: Board expressed concerns. Patience at {:.0}%.",
                 year, board.patience
             ));
         } else {
-            messages.push(format!(
+            messages.push_back(format!(
                 "[BOARD] Annual Review Q4 {}: Board is pleased with progress. Patience at {:.0}%.",
                 year, board.patience
             ));

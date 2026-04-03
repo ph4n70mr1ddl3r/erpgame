@@ -2,6 +2,7 @@ use rand::Rng;
 use serde::{Deserialize, Serialize};
 
 use super::state::{ExpansionPolicy, MarketingPolicy, PricingPolicy};
+use std::collections::VecDeque;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Competitor {
@@ -65,7 +66,7 @@ pub fn update_competitors_with_actions(
     competitors: &mut [Competitor],
     rng: &mut rand::rngs::ThreadRng,
     player: &PlayerActions,
-    messages: &mut Vec<String>,
+    messages: &mut VecDeque<String>,
 ) {
     let normal_actions = [
         "Opened a new store in Cebu City",
@@ -134,7 +135,7 @@ pub fn update_competitors_with_actions(
             comp.recent_action = action.to_string();
             comp.quarters_since_action = 0;
             if rng.gen_bool(0.4) {
-                messages.push(format!("[INTEL] {}: {}", comp.name, comp.recent_action));
+                messages.push_back(format!("[INTEL] {}: {}", comp.name, comp.recent_action));
             }
             continue;
         }
@@ -151,7 +152,7 @@ pub fn update_competitors_with_actions(
             comp.recent_action = action.to_string();
             comp.quarters_since_action = 0;
             if rng.gen_bool(0.4) {
-                messages.push(format!("[INTEL] {}: {}", comp.name, comp.recent_action));
+                messages.push_back(format!("[INTEL] {}: {}", comp.name, comp.recent_action));
             }
             continue;
         }
@@ -170,7 +171,7 @@ pub fn update_competitors_with_actions(
             comp.recent_action = action.to_string();
             comp.quarters_since_action = 0;
             if rng.gen_bool(0.3) {
-                messages.push(format!("[INTEL] {}: {}", comp.name, comp.recent_action));
+                messages.push_back(format!("[INTEL] {}: {}", comp.name, comp.recent_action));
             }
         }
     }

@@ -1,6 +1,6 @@
 use rand::Rng;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::sync::LazyLock;
 
 use super::achievements::default_achievements;
@@ -26,11 +26,11 @@ pub struct GameState {
     pub economy: EconomyState,
     pub market: MarketState,
     pub financial_history: Vec<QuarterlyReport>,
-    pub event_log: Vec<GameEvent>,
+    pub event_log: VecDeque<GameEvent>,
     pub current_quarter: i32,
     pub current_year: i32,
     pub game_over: bool,
-    pub messages: Vec<String>,
+    pub messages: VecDeque<String>,
     pub pending_events: Vec<PendingEvent>,
     pub delegation: DelegationSettings,
     pub decisions_made: u32,
@@ -832,6 +832,9 @@ pub fn format_currency(amount: f64) -> String {
 }
 
 pub fn format_currency_full(amount: f64) -> String {
+    if !amount.is_finite() {
+        return "₱0".into();
+    }
     let abs = (amount.abs()).round() as u64;
     let s = abs.to_string();
     let chars: Vec<char> = s.chars().collect();
@@ -935,13 +938,13 @@ impl GameState {
                 demand_trend: 1.0,
             },
             financial_history: vec![],
-            event_log: vec![],
+            event_log: VecDeque::new(),
             current_quarter: 1,
             current_year: 2025,
             game_over: false,
-            messages: vec![
+            messages: VecDeque::from([
                 "Welcome to Bahay Depot! You are the new CEO. Your first store is open in Quezon City. Set your policies, hire your executive team, and grow the company!".into(),
-            ],
+            ]),
             pending_events: vec![],
             delegation: DelegationSettings::all_false(),
             decisions_made: 0,
@@ -975,17 +978,21 @@ impl GameState {
     }
 
     pub fn log_event(&mut self, event: GameEvent) {
-        self.event_log.insert(0, event);
-        if self.event_log.len() > MAX_EVENT_LOG_SIZE {
-            self.event_log.pop();
+        self.event_log.push_front(event);
+        while self.event_log.len() > MAX_EVENT_LOG_SIZE {
+            self.event_log.pop_back();
         }
     }
 
     pub fn push_message(&mut self, msg: String) {
-        self.messages.push(msg);
+        self.messages.push_back(msg);
         while self.messages.len() > MAX_MESSAGES {
-            self.messages.remove(0);
+            self.messages.pop_front();
         }
+    }
+
+    pub fn messages_vec(&self) -> Vec<String> {
+        self.messages.iter().cloned().collect()
     }
 
     pub fn has_pending_events(&self) -> bool {
@@ -1023,7 +1030,7 @@ impl GameState {
                 year: event.year,
             });
             self.messages
-                .push(format!("[DECISION] {}: {}", event.title, choice.label));
+                .push_back(format!("[DECISION] {}: {}", event.title, choice.label));
         }
         Some(event)
     }

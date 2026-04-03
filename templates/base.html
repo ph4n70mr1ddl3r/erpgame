@@ -83,7 +83,9 @@
                 <a href="/events" class="nav-link {% if active_page == "events" %}active{% endif %}">&#128240; Event Log</a>
             </nav>
             <div style="padding: 0.75rem; border-top: 1px solid #334155;">
-                <a href="/new-game" style="display: block; text-align: center; padding: 0.5rem; border-radius: 0.5rem; background: #334155; color: #94a3b8; text-decoration: none; font-size: 0.8rem;">New Game</a>
+                <form action="/new-game" method="POST" style="margin: 0;">
+                    <button type="submit" style="display: block; width: 100%; text-align: center; padding: 0.5rem; border-radius: 0.5rem; background: #334155; color: #94a3b8; border: none; text-decoration: none; font-size: 0.8rem; cursor: pointer;">New Game</button>
+                </form>
             </div>
         </aside>
 

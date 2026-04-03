@@ -22,7 +22,7 @@ pub fn generate_auto_events(state: &GameState, rng: &mut rand::rngs::ThreadRng) 
             title: format!("Typhoon hits the Philippines! (Severity: {:.0}%)", severity * 100.0),
             description: "A powerful typhoon has caused damage to stores and disrupted supply chains.".into(),
             event_type: EventType::NaturalDisaster,
-            impact: EventImpact { cash_impact: -damage, revenue_impact: -0.1 * severity, expense_impact: damage * 0.5, morale_impact: -5.0 * severity, reputation_impact: -2.0, satisfaction_impact: -5.0 * severity },
+            impact: EventImpact { cash_impact: -damage, revenue_impact: -0.1 * severity, expense_impact: 0.0, morale_impact: -5.0 * severity, reputation_impact: -2.0, satisfaction_impact: -5.0 * severity },
             quarter: state.current_quarter,
             year: state.current_year,
         });

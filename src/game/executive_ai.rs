@@ -19,7 +19,12 @@ pub fn generate_recommendations(state: &mut GameState) {
 }
 
 fn cfo_recommendation(state: &GameState, _exec: &Executive) -> String {
-    let cash_months = state.company.cash / (state.company.total_expenses / 3.0).max(1.0);
+    let quarterly_expenses = state
+        .financial_history
+        .last()
+        .map(|r| r.expenses)
+        .unwrap_or(1.0);
+    let cash_months = state.company.cash / (quarterly_expenses / 3.0).max(1.0);
     if cash_months < 3.0 {
         format!("URGENT: Cash reserves critically low ({} months runway). Consider reducing expenses or securing a loan.", fmt_months(cash_months))
     } else if state.company.cash > 100_000_000.0

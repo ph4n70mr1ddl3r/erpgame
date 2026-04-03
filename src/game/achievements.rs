@@ -268,12 +268,7 @@ pub fn check_achievements(state: &mut GameState, last_revenue: f64) {
         &q_label,
         state.company.cash >= 200_000_000.0,
     );
-    check_one(
-        state,
-        "debt_free",
-        &q_label,
-        state.company.has_ever_had_loan && state.company.loans.is_empty(),
-    );
+    check_one(state, "debt_free", &q_label, state.company.loans.is_empty());
 
     let consecutive_profit = state
         .financial_history
@@ -288,7 +283,7 @@ pub fn check_achievements(state: &mut GameState, last_revenue: f64) {
         consecutive_profit && state.financial_history.len() >= 5,
     );
 
-    let all_max_invest = state.products.iter().all(|p| p.investment_level >= 99.0);
+    let all_max_invest = state.products.iter().all(|p| p.investment_level >= 100.0);
     check_one(state, "product_pioneer", &q_label, all_max_invest);
     check_one(
         state,
@@ -339,7 +334,7 @@ fn check_one(state: &mut GameState, id: &str, q_label: &str, condition: bool) {
         if !ach.unlocked {
             ach.unlocked = true;
             ach.unlocked_quarter = Some(q_label.to_string());
-            state.messages.push(format!(
+            state.messages.push_back(format!(
                 "[ACHIEVEMENT] Unlocked: {} - {}",
                 ach.title, ach.description
             ));

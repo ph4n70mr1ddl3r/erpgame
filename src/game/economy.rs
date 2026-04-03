@@ -8,8 +8,10 @@ impl EconomyState {
             "Healthy economic growth".into()
         } else if self.gdp_growth_rate > 3.0 {
             "Moderate economic growth".into()
-        } else {
+        } else if self.gdp_growth_rate > 0.0 {
             "Slowing economy".into()
+        } else {
+            "Economy in recession".into()
         }
     }
 }

@@ -187,6 +187,16 @@ pub fn upgrade_ecommerce(
         return Err("Already at this level.");
     }
 
+    if new_level == EcommerceLevel::None {
+        return downgrade_ecommerce(state);
+    }
+
+    let current_ord = state.ecommerce.level as u8;
+    let new_ord = new_level as u8;
+    if new_ord != current_ord + 1 {
+        return Err("You can only upgrade one level at a time.");
+    }
+
     let operating = state.operating_store_count();
     if operating < new_level.min_stores() {
         return Err("Not enough operating stores for this level.");
@@ -214,6 +224,15 @@ pub fn upgrade_ecommerce(
     }
 
     Ok(cost)
+}
+
+fn downgrade_ecommerce(state: &mut GameState) -> Result<f64, &'static str> {
+    state.ecommerce.level = EcommerceLevel::None;
+    state.ecommerce.quarters_active = 0;
+    state.ecommerce.quarterly_online_revenue = 0.0;
+    state.ecommerce.conversion_rate = 0.0;
+    state.push_message("E-commerce channel shut down. Online presence discontinued.".into());
+    Ok(0.0)
 }
 
 pub fn process_ecommerce(state: &mut GameState) -> f64 {
@@ -278,28 +297,4 @@ pub fn process_ecommerce(state: &mut GameState) -> f64 {
         .clamp(10.0, 100.0);
 
     maintenance_cost
-}
-
-pub fn ecommerce_revenue_bonus(state: &GameState) -> f64 {
-    if state.ecommerce.level == EcommerceLevel::None {
-        return 0.0;
-    }
-
-    let cto_skill = state
-        .executives
-        .iter()
-        .find(|e| e.position == super::state::ExecutivePosition::CTO)
-        .map(|e| e.skill)
-        .unwrap_or(0.0);
-
-    let cto_factor = 1.0 + cto_skill * 0.005;
-    let sat_factor = state.company.customer_satisfaction / 100.0;
-
-    let ramp_up = if state.ecommerce.quarters_active <= 4 {
-        0.5 + state.ecommerce.quarters_active as f64 * 0.125
-    } else {
-        1.0
-    };
-
-    state.ecommerce.level.revenue_bonus() * cto_factor * sat_factor * ramp_up
 }

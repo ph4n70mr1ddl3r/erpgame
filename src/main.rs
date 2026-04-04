@@ -68,6 +68,7 @@ async fn main() {
         .route("/employees/hire", post(api::routes::hire_employee_route))
         .route("/employees/{id}/fire", post(api::routes::fire_employee_route))
         .route("/employees/train", post(api::routes::train_employee_route))
+        .route("/employees/train-role", post(api::routes::train_role_route))
         .with_state(game_state)
         .nest_service("/static", ServeDir::new("static"));
 

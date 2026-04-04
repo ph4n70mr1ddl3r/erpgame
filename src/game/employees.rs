@@ -523,7 +523,8 @@ impl EmployeeSystem {
             0.0
         };
         self.turnover_rate =
-            (base_turnover + morale_turnover_adj + rng.gen_range(-1.0..1.0)).clamp(1.0, 25.0);
+            (base_turnover + morale_turnover_adj + rng.gen_range(-1.0_f64..1.0_f64))
+                .clamp(1.0, 25.0);
 
         let employees_to_remove: Vec<String> = self
             .employees

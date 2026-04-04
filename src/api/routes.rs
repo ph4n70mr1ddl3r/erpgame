@@ -29,6 +29,7 @@ use crate::game::{
         available_supplier_categories, negotiate_supplier, terminate_supplier,
         upgrade_logistics, upgrade_warehouse, upgrade_delivery_service,
     },
+    employees::{EmployeeRole, TrainingType},
 };
 use super::dto::*;
 
@@ -1751,30 +1752,35 @@ pub async fn employees_page(State(state): State<AppState>) -> Response {
         let store_name = if let Some(ref store_id) = emp.store_id {
             s.stores.iter()
                 .find(|st| &st.id == store_id)
-                .map(|st| format!("{} - {}", st.name, st.city)
+                .map(|st| format!("{} - {}", st.name, st.city))
                 .unwrap_or_else(|| "Unknown Store".to_string())
         } else {
             "Corporate HQ".to_string()
         };
 
-        let morale_class = if emp.morale >= 70.0 { "text-green-400" } else if emp.morale >= 50.0 { "text-yellow-400" } else { "text-red-400" });
-            } else {
-                "text-green-400".to_string()
-            }
+        let morale_class = if emp.morale >= 70.0 { "text-green-400" } else if emp.morale >= 50.0 { "text-yellow-400" } else { "text-red-400" };
+        let performance_class = if emp.performance_rating >= 70.0 { "text-green-400" } else if emp.performance_rating >= 50.0 { "text-yellow-400" } else { "text-red-400" };
+
+        employee_rows.push(EmployeeRow {
+            id: emp.id.clone(),
+            name: emp.name.clone(),
+            role_key: emp.role.key().to_string(),
+            role_name: emp.role.label().to_string(),
+            category: emp.role.category().label().to_string(),
+            store_name,
+            salary_monthly: format_currency(emp.salary_monthly),
+            skill: format!("{:.1}%", emp.skill),
+            morale: format!("{:.1}%", emp.morale),
+            morale_class: morale_class.to_string(),
+            performance: format!("{:.0}%", emp.performance_rating),
+            performance_class: performance_class.to_string(),
+            tenure: format!("{} Q", emp.tenure_quarters),
+            training_count: emp.training_count,
         });
     }
 
-    let stats = EmployeeStats {
-        total_count: s.employee_system.total_count
-        monthly_payroll: format_currency_full(s.employee_system.monthly_payroll)
-        avg_morale: format!("{:.1}%", s.employee_system.avg_morale)
-        avg_skill: format!("{:.1}%", s.employee_system.avg_skill)
-        turnover_rate: format!("{:.1}%", s.employee_system.turnover_rate)
-    };
-}
-
     let mut role_options: Vec<RoleOption> = Vec::new();
-    for role in super::employees::EmployeeRole::all_roles() {
+    for role in EmployeeRole::all_roles() {
         role_options.push(RoleOption {
             key: role.key().to_string(),
             name: role.label().to_string(),
@@ -1782,6 +1788,14 @@ pub async fn employees_page(State(state): State<AppState>) -> Response {
             base_salary: format_currency_full(role.base_salary()),
         });
     }
+
+    let training_options: Vec<TrainingOptionRow> = TrainingType::all_types().iter().map(|t| TrainingOptionRow {
+        key: t.key().to_string(),
+        name: t.label().to_string(),
+        cost_per_employee: format_currency_full(t.cost_per_employee()),
+        skill_bonus: format!("{:+.1}%", t.skill_bonus()),
+        morale_bonus: format!("{:+.1}%", t.morale_bonus()),
+    }).collect();
 
     let stats = EmployeeStats {
         total_count: s.employee_system.total_count,
@@ -1812,6 +1826,7 @@ pub async fn employees_page(State(state): State<AppState>) -> Response {
     crate::templates::EmployeesTemplate {
         employees: employee_rows,
         role_options,
+        training_options,
         stats,
         stores: store_rows,
         cash: format_currency_full(s.company.cash),
@@ -1823,7 +1838,7 @@ pub async fn employees_page(State(state): State<AppState>) -> Response {
 
 pub async fn hire_employee_route(State(state): State<AppState>, Form(form): Form<super::dto::HireEmployeeForm>) -> Response {
     let mut state = state.lock().await;
-    let role = match super::employees::EmployeeRole::from_key(&form.role) {
+    let role = match EmployeeRole::from_key(&form.role) {
         Some(r) => r,
         None => {
             state.push_message("Invalid employee role.".into());
@@ -1831,7 +1846,7 @@ pub async fn hire_employee_route(State(state): State<AppState>, Form(form): Form
         }
     };
 
-    let store_id = form.store_id.as_ref().and(|s| s.as_str());
+    let store_id = form.store_id.as_ref().and_then(|s| if s.is_empty() { None } else { Some(s.clone()) });
     let hr_multiplier = match state.policies.hr {
         HrPolicy::Minimal => 1.0,
         HrPolicy::Standard => 1.1,
@@ -1840,7 +1855,7 @@ pub async fn hire_employee_route(State(state): State<AppState>, Form(form): Form
     };
 
     let mut rng = rand::thread_rng();
-    let hiring_cost = state.employee_system.hire(&mut rng, role, store_id.map(|s| s.to_string()), hr_multiplier);
+    let hiring_cost = state.employee_system.hire(&mut rng, role, store_id, hr_multiplier);
 
     if state.company.cash < hiring_cost {
         state.push_message(format!("Cannot afford hiring cost of {}", format_currency(hiring_cost)));
@@ -1877,7 +1892,7 @@ pub async fn fire_employee_route(State(state): State<AppState>, Path(id): Path<S
 
 pub async fn train_employee_route(State(state): State<AppState>, Form(form): Form<super::dto::TrainEmployeeForm>) -> Response {
     let mut state = state.lock().await;
-    let training_type = match super::employees::TrainingType::from_key(&form.training_type) {
+    let training_type = match TrainingType::from_key(&form.training_type) {
         Some(t) => t,
         None => {
             state.push_message("Invalid training type.".into());
@@ -1898,5 +1913,40 @@ pub async fn train_employee_route(State(state): State<AppState>, Form(form): For
             state.push_message("Employee not found.".into());
         }
     }
+    Redirect::to("/employees").into_response()
+}
+
+pub async fn train_role_route(State(state): State<AppState>, Form(form): Form<super::dto::TrainRoleForm>) -> Response {
+    let mut state = state.lock().await;
+    let role = match EmployeeRole::from_key(&form.role) {
+        Some(r) => r,
+        None => {
+            state.push_message("Invalid role selected.".into());
+            return Redirect::to("/employees").into_response();
+        }
+    };
+
+    let training_type = match TrainingType::from_key(&form.training_type) {
+        Some(t) => t,
+        None => {
+            state.push_message("Invalid training type.".into());
+            return Redirect::to("/employees").into_response();
+        }
+    };
+
+    let (count, total_cost) = state.employee_system.train_all_role(role, training_type);
+    
+    if count == 0 {
+        state.push_message("No employees found with that role.".into());
+        return Redirect::to("/employees").into_response();
+    }
+
+    if state.company.cash < total_cost {
+        state.push_message(format!("Cannot afford training cost of {} for {} employees", format_currency(total_cost), count));
+        return Redirect::to("/employees").into_response();
+    }
+
+    state.company.cash -= total_cost;
+    state.push_message(format!("Trained {} {} employees. Total cost: {}", count, role.label(), format_currency(total_cost)));
     Redirect::to("/employees").into_response()
 }

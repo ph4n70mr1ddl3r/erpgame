@@ -48,6 +48,32 @@
     </form>
 </div>
 
+<div class="card" style="padding: 1rem; margin-bottom: 1.5rem;">
+    <h3 style="font-size: 0.9rem; font-weight: 600; margin-bottom: 0.75rem; color: #94a3b8;">TRAIN ALL BY ROLE</h3>
+    <form action="/employees/train-role" method="POST" style="display: grid; grid-template-columns: 2fr 2fr 1fr; gap: 0.75rem; align-items: end;">
+        <div>
+            <label style="font-size: 0.8rem; color: #94a3b8; display: block; margin-bottom: 0.25rem;">Role</label>
+            <select name="role" required>
+                <option value="">Select Role...</option>
+                {% for role in role_options %}
+                <option value="{{ role.key }}">{{ role.name }} ({{ role.category }})</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label style="font-size: 0.8rem; color: #94a3b8; display: block; margin-bottom: 0.25rem;">Training Type</label>
+            <select name="training_type" required>
+                <option value="">Select Training...</option>
+                {% for t in training_options %}
+                <option value="{{ t.key }}">{{ t.name }} - {{ t.cost_per_employee }}/emp (Skill: {{ t.skill_bonus }}, Morale: {{ t.morale_bonus }})</option>
+                {% endfor %}
+            </select>
+        </div>
+        <button type="submit" class="btn-primary">Train All</button>
+    </form>
+    <p style="font-size: 0.75rem; color: #64748b; margin-top: 0.5rem;">Training all employees of a role at once improves their skills and morale.</p>
+</div>
+
 {% if employees.len() > 0 %}
 <div class="card" style="padding: 1rem;">
     <h3 style="font-size: 0.9rem; font-weight: 600; margin-bottom: 0.75rem; color: #94a3b8;">EMPLOYEES ({{ employees.len() }})</h3>
@@ -81,6 +107,11 @@
                 <td style="color: #64748b; font-size: 0.85rem;">{{ e.tenure }}</td>
                 <td>
                     <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                        <form action="/employees/train" method="POST" style="display: inline;">
+                            <input type="hidden" name="employee_id" value="{{ e.id }}">
+                            <input type="hidden" name="training_type" value="basic">
+                            <button type="submit" class="btn-primary btn-sm" title="Basic Training">Train</button>
+                        </form>
                         <form action="/employees/{{ e.id }}/fire" method="POST" style="display: inline;" onsubmit="return confirm('Fire {{ e.name }}? This will cost severance.');">
                             <button type="submit" class="btn-danger btn-sm">Fire</button>
                         </form>

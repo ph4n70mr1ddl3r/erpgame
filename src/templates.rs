@@ -336,6 +336,7 @@ pub struct CsrTemplate {
 pub struct EmployeesTemplate {
     pub employees: Vec<crate::api::dto::EmployeeRow>,
     pub role_options: Vec<crate::api::dto::RoleOption>,
+    pub training_options: Vec<crate::api::dto::TrainingOptionRow>,
     pub stats: crate::api::dto::EmployeeStats,
     pub stores: Vec<crate::api::dto::StoreRow>,
     pub cash: String,

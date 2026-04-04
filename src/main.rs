@@ -61,6 +61,9 @@ async fn main() {
         .route("/research", get(api::routes::research_page))
         .route("/research/start", post(api::routes::start_research_route))
         .route("/research/cancel", post(api::routes::cancel_research_route))
+        .route("/csr", get(api::routes::csr_page))
+        .route("/csr/launch", post(api::routes::launch_csr_route))
+        .route("/csr/{id}/discontinue", post(api::routes::discontinue_csr_route))
         .with_state(game_state)
         .nest_service("/static", ServeDir::new("static"));
 

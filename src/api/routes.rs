@@ -14,6 +14,7 @@ use crate::game::{
     generate_executive_name, get_available_cities, pct, simulate_quarter,
     achievements::unlocked_count, competitors::total_competitor_market_share,
     campaigns::{CampaignType, campaign_revenue_multiplier, launch_campaign},
+    csr::{CsrInitiative, launch_initiative, discontinue_initiative, csr_tax_deduction},
     ecommerce::{EcommerceLevel, upgrade_ecommerce},
     loyalty::{LoyaltyTier, loyalty_revenue_multiplier},
     private_label::{self, PrivateLabelStatus},
@@ -1630,4 +1631,113 @@ pub async fn cancel_research_route(State(state): State<AppState>) -> Response {
         }
     }
     Redirect::to("/research").into_response()
+}
+
+pub async fn csr_page(State(state): State<AppState>) -> Response {
+    let state = state.lock().await;
+    let s = &*state;
+
+    let active_rows: Vec<crate::api::dto::CsrInitiativeRow> = s.csr.active_initiatives.iter().map(|i| {
+        let init = i.initiative;
+        crate::api::dto::CsrInitiativeRow {
+            id: i.id.clone(),
+            name: init.label().to_string(),
+            icon: init.icon().to_string(),
+            quarterly_cost: format_currency(init.quarterly_cost()),
+            quarters_active: i.quarters_active,
+            total_invested: format_currency(i.total_invested),
+            reputation_bonus: format!("+{:.1}/Q", init.reputation_bonus()),
+            satisfaction_bonus: format!("+{:.1}/Q", init.satisfaction_bonus()),
+            morale_bonus: format!("+{:.1}/Q", init.employee_morale_bonus()),
+        }
+    }).collect();
+
+    let active_keys: std::collections::HashSet<CsrInitiative> = s.csr.active_initiatives.iter().map(|i| i.initiative).collect();
+
+    let options: Vec<crate::api::dto::CsrOptionRow> = CsrInitiative::all_initiatives().iter().map(|init| {
+        let already_active = active_keys.contains(init);
+        let can_afford = s.company.cash >= init.setup_cost();
+        let has_stores = s.operating_store_count() >= init.min_stores();
+        let (can_launch, reason, show_reason) = if already_active {
+            (false, "Already active".into(), true)
+        } else if !has_stores {
+            (false, format!("Need {} stores", init.min_stores()), true)
+        } else if !can_afford {
+            (false, format!("Need {}", format_currency(init.setup_cost())), true)
+        } else {
+            (true, String::new(), false)
+        };
+        crate::api::dto::CsrOptionRow {
+            key: init.key().to_string(),
+            name: init.label().to_string(),
+            icon: init.icon().to_string(),
+            description: init.description().to_string(),
+            setup_cost: format_currency(init.setup_cost()),
+            quarterly_cost: format_currency(init.quarterly_cost()),
+            reputation_bonus: format!("+{:.1}/Q", init.reputation_bonus()),
+            satisfaction_bonus: format!("+{:.1}/Q", init.satisfaction_bonus()),
+            morale_bonus: format!("+{:.1}/Q", init.employee_morale_bonus()),
+            tax_deduction: format!("{:.0}%", init.tax_deduction_rate() * 100.0),
+            min_stores: init.min_stores(),
+            can_launch,
+            reason,
+            show_reason,
+        }
+    }).collect();
+
+    let total_q_cost: f64 = s.csr.active_initiatives.iter().map(|i| i.initiative.quarterly_cost()).sum();
+    let tax_ded = csr_tax_deduction(s);
+    let chro_skill = s.executives.iter().find(|e| e.position == ExecutivePosition::CHRO).map(|e| format!("{:.0}/100", e.skill)).unwrap_or_else(|| "Not hired".into());
+
+    crate::templates::CsrTemplate {
+        active_initiatives: active_rows,
+        options,
+        csr_score: format!("{:.0}/100", s.csr.csr_score),
+        active_count: s.csr.active_initiatives.len(),
+        total_donated: format_currency(s.csr.total_donated),
+        quarterly_cost: format_currency(total_q_cost),
+        tax_deduction: format!("{:.1}%", tax_ded * 100.0),
+        chro_skill,
+        cash: format_currency_full(s.company.cash),
+        messages: s.messages_vec(),
+        current_quarter: s.current_quarter_label(),
+        active_page: "csr".to_string(),
+    }.into_response()
+}
+
+pub async fn launch_csr_route(State(state): State<AppState>, Form(form): Form<super::dto::CsrForm>) -> Response {
+    let mut state = state.lock().await;
+    let initiative = match CsrInitiative::from_key(&form.initiative) {
+        Some(i) => i,
+        None => {
+            state.push_message("Invalid CSR initiative.".into());
+            return Redirect::to("/csr").into_response();
+        }
+    };
+    match launch_initiative(&mut state, initiative) {
+        Ok(cost) => {
+            state.push_message(format!(
+                "Launched '{}' CSR initiative for {}. It will provide ongoing benefits each quarter.",
+                initiative.label(),
+                format_currency(cost),
+            ));
+        }
+        Err(msg) => {
+            state.push_message(msg.to_string());
+        }
+    }
+    Redirect::to("/csr").into_response()
+}
+
+pub async fn discontinue_csr_route(State(state): State<AppState>, Path(id): Path<String>) -> Response {
+    let mut state = state.lock().await;
+    match discontinue_initiative(&mut state, &id) {
+        Ok(name) => {
+            state.push_message(format!("Discontinued '{}' CSR initiative.", name));
+        }
+        Err(msg) => {
+            state.push_message(msg.to_string());
+        }
+    }
+    Redirect::to("/csr").into_response()
 }

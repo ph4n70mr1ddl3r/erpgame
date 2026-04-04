@@ -270,7 +270,11 @@ pub fn process_ecommerce(state: &mut GameState) -> f64 {
         super::state::MarketingPolicy::Aggressive => 1.3,
     };
 
-    let online_revenue = (base_rev * cto_factor * sat_factor * ramp_up * marketing_factor).max(0.0);
+    let delivery_factor = 1.0 + state.supply_chain.delivery_service.revenue_bonus();
+
+    let online_revenue =
+        (base_rev * cto_factor * sat_factor * ramp_up * marketing_factor * delivery_factor)
+            .max(0.0);
     channel.quarterly_online_revenue = online_revenue;
     channel.total_online_revenue += online_revenue;
 
@@ -283,7 +287,8 @@ pub fn process_ecommerce(state: &mut GameState) -> f64 {
     let maintenance_cost = channel.level.quarterly_cost();
 
     state.company.customer_satisfaction = (state.company.customer_satisfaction
-        + channel.level.satisfaction_bonus() * 0.1)
+        + channel.level.satisfaction_bonus() * 0.1
+        + state.supply_chain.delivery_service.satisfaction_bonus() * 0.05)
         .clamp(10.0, 100.0);
     state.company.brand_reputation = (state.company.brand_reputation
         + channel.level.reputation_bonus() * 0.05)

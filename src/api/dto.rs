@@ -530,3 +530,44 @@ pub struct ResearchTrackRow {
     pub show_reason: bool,
     pub min_stores: u32,
 }
+
+#[derive(Debug, Deserialize)]
+pub struct CsrForm {
+    pub initiative: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct CsrDiscontinueForm {
+    pub initiative_id: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct CsrInitiativeRow {
+    pub id: String,
+    pub name: String,
+    pub icon: String,
+    pub quarterly_cost: String,
+    pub quarters_active: i32,
+    pub total_invested: String,
+    pub reputation_bonus: String,
+    pub satisfaction_bonus: String,
+    pub morale_bonus: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct CsrOptionRow {
+    pub key: String,
+    pub name: String,
+    pub icon: String,
+    pub description: String,
+    pub setup_cost: String,
+    pub quarterly_cost: String,
+    pub reputation_bonus: String,
+    pub satisfaction_bonus: String,
+    pub morale_bonus: String,
+    pub tax_deduction: String,
+    pub min_stores: u32,
+    pub can_launch: bool,
+    pub reason: String,
+    pub show_reason: bool,
+}

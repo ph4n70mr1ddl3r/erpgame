@@ -1,0 +1,120 @@
+warning: unused import: `csr_reputation_multiplier`
+  --> src/api/routes.rs:17:88
+   |
+17 |     csr::{CsrInitiative, launch_initiative, discontinue_initiative, csr_tax_deduction, csr_reputation_multiplier},
+   |                                                                                        ^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `research_ecommerce_mult`
+   --> src/game/simulation.rs:452:9
+    |
+452 |     let research_ecommerce_mult = research_ecommerce_bonus(state);
+    |         ^^^^^^^^^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_research_ecommerce_mult`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `research_sat_boost`
+   --> src/game/simulation.rs:453:9
+    |
+453 |     let research_sat_boost = research_satisfaction_bonus(state);
+    |         ^^^^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_research_sat_boost`
+
+warning: unused variable: `research_rep_boost`
+   --> src/game/simulation.rs:454:9
+    |
+454 |     let research_rep_boost = research_reputation_bonus(state);
+    |         ^^^^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_research_rep_boost`
+
+warning: function `csr_reputation_multiplier` is never used
+   --> src/game/csr.rs:315:8
+    |
+315 | pub fn csr_reputation_multiplier(state: &GameState) -> f64 {
+    |        ^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: method `emoji` is never used
+  --> src/game/research.rs:53:12
+   |
+16 | impl ResearchTrack {
+   | ------------------ method in this implementation
+...
+53 |     pub fn emoji(&self) -> &str {
+   |            ^^^^^
+
+warning: function `research_employee_satisfaction_bonus` is never used
+   --> src/game/research.rs:395:8
+    |
+395 | pub fn research_employee_satisfaction_bonus(state: &GameState) -> f64 {
+    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `research_product_margin_bonus` is never used
+   --> src/game/research.rs:401:8
+    |
+401 | pub fn research_product_margin_bonus(state: &GameState) -> f64 {
+    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: struct `CsrDiscontinueForm` is never constructed
+   --> src/api/dto.rs:540:12
+    |
+540 | pub struct CsrDiscontinueForm {
+    |            ^^^^^^^^^^^^^^^^^^
+
+warning: fields `active_progress` and `cto_skill` are never read
+   --> src/templates.rs:305:9
+    |
+301 | pub struct ResearchTemplate {
+    |            ---------------- fields in this struct
+...
+305 |     pub active_progress: f64,
+    |         ^^^^^^^^^^^^^^^
+...
+310 |     pub cto_skill: String,
+    |         ^^^^^^^^^
+
+warning: calls to `std::mem::drop` with a reference instead of an owned value does nothing
+   --> src/game/research.rs:261:5
+    |
+261 |     drop(project); // end immutable borrow
+    |     ^^^^^-------^
+    |          |
+    |          argument has type `&ResearchProject`
+    |
+    = note: `#[warn(dropping_references)]` on by default
+help: use `let _ = ...` to ignore the expression or result
+    |
+261 -     drop(project); // end immutable borrow
+261 +     let _ = project; // end immutable borrow
+    |
+
+warning: calls to `std::mem::drop` with a reference instead of an owned value does nothing
+   --> src/game/research.rs:262:5
+    |
+262 |     drop(lab);
+    |     ^^^^^---^
+    |          |
+    |          argument has type `&ResearchLab`
+    |
+help: use `let _ = ...` to ignore the expression or result
+    |
+262 -     drop(lab);
+262 +     let _ = lab;
+    |
+
+warning: calls to `std::mem::drop` with a reference instead of an owned value does nothing
+   --> src/game/research.rs:344:9
+    |
+344 |         drop(project); // release borrow
+    |         ^^^^^-------^
+    |              |
+    |              argument has type `&mut ResearchProject`
+    |
+help: use `let _ = ...` to ignore the expression or result
+    |
+344 -         drop(project); // release borrow
+344 +         let _ = project; // release borrow
+    |
+
+warning: `erpgame` (bin "erpgame") generated 13 warnings (run `cargo fix --bin "erpgame" -p erpgame` to apply 4 suggestions)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.06s

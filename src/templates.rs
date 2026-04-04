@@ -313,3 +313,20 @@ pub struct ResearchTemplate {
     pub current_quarter: String,
     pub active_page: String,
 }
+
+#[derive(Template)]
+#[template(path = "csr.html")]
+pub struct CsrTemplate {
+    pub active_initiatives: Vec<crate::api::dto::CsrInitiativeRow>,
+    pub options: Vec<crate::api::dto::CsrOptionRow>,
+    pub csr_score: String,
+    pub active_count: usize,
+    pub total_donated: String,
+    pub quarterly_cost: String,
+    pub tax_deduction: String,
+    pub chro_skill: String,
+    pub cash: String,
+    pub messages: Vec<String>,
+    pub current_quarter: String,
+    pub active_page: String,
+}

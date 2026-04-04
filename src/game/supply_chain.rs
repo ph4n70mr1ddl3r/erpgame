@@ -283,6 +283,107 @@ impl WarehouseTier {
     }
 }
 
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+pub enum DeliveryServiceLevel {
+    None,
+    Basic,
+    SameDay,
+    Express,
+}
+
+impl DeliveryServiceLevel {
+    pub fn label(&self) -> &str {
+        match self {
+            DeliveryServiceLevel::None => "No Delivery Service",
+            DeliveryServiceLevel::Basic => "Basic Delivery",
+            DeliveryServiceLevel::SameDay => "Same-Day Delivery",
+            DeliveryServiceLevel::Express => "Express Delivery (2‑Hour)",
+        }
+    }
+
+    pub fn key(&self) -> &str {
+        match self {
+            DeliveryServiceLevel::None => "none",
+            DeliveryServiceLevel::Basic => "basic",
+            DeliveryServiceLevel::SameDay => "same_day",
+            DeliveryServiceLevel::Express => "express",
+        }
+    }
+
+    pub fn description(&self) -> &str {
+        match self {
+            DeliveryServiceLevel::None => "No dedicated delivery service. Customers must pick up in‑store or use third‑party carriers.",
+            DeliveryServiceLevel::Basic => "Standard delivery within 3‑5 business days. Handles small parcels and light building materials.",
+            DeliveryServiceLevel::SameDay => "Same‑day delivery for orders placed before noon. Requires local dispatch teams and optimized routing.",
+            DeliveryServiceLevel::Express => "2‑hour express delivery for urgent orders. Premium service with real‑time tracking and dedicated fleet.",
+        }
+    }
+
+    pub fn setup_cost(&self) -> f64 {
+        match self {
+            DeliveryServiceLevel::None => 0.0,
+            DeliveryServiceLevel::Basic => 5_000_000.0,
+            DeliveryServiceLevel::SameDay => 20_000_000.0,
+            DeliveryServiceLevel::Express => 50_000_000.0,
+        }
+    }
+
+    pub fn quarterly_cost(&self) -> f64 {
+        match self {
+            DeliveryServiceLevel::None => 0.0,
+            DeliveryServiceLevel::Basic => 1_000_000.0,
+            DeliveryServiceLevel::SameDay => 3_000_000.0,
+            DeliveryServiceLevel::Express => 8_000_000.0,
+        }
+    }
+
+    pub fn revenue_bonus(&self) -> f64 {
+        match self {
+            DeliveryServiceLevel::None => 0.0,
+            DeliveryServiceLevel::Basic => 0.03,
+            DeliveryServiceLevel::SameDay => 0.08,
+            DeliveryServiceLevel::Express => 0.15,
+        }
+    }
+
+    pub fn satisfaction_bonus(&self) -> f64 {
+        match self {
+            DeliveryServiceLevel::None => 0.0,
+            DeliveryServiceLevel::Basic => 1.0,
+            DeliveryServiceLevel::SameDay => 3.0,
+            DeliveryServiceLevel::Express => 6.0,
+        }
+    }
+
+    pub fn min_stores(&self) -> u32 {
+        match self {
+            DeliveryServiceLevel::None => 0,
+            DeliveryServiceLevel::Basic => 1,
+            DeliveryServiceLevel::SameDay => 3,
+            DeliveryServiceLevel::Express => 6,
+        }
+    }
+
+    pub fn all_levels() -> Vec<DeliveryServiceLevel> {
+        vec![
+            DeliveryServiceLevel::None,
+            DeliveryServiceLevel::Basic,
+            DeliveryServiceLevel::SameDay,
+            DeliveryServiceLevel::Express,
+        ]
+    }
+
+    pub fn from_key(key: &str) -> Option<Self> {
+        match key {
+            "none" => Some(DeliveryServiceLevel::None),
+            "basic" => Some(DeliveryServiceLevel::Basic),
+            "same_day" => Some(DeliveryServiceLevel::SameDay),
+            "express" => Some(DeliveryServiceLevel::Express),
+            _ => None,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Supplier {
     pub id: String,
@@ -314,6 +415,7 @@ pub struct SupplyChainState {
     pub suppliers: Vec<Supplier>,
     pub logistics: LogisticsLevel,
     pub warehouse: WarehouseTier,
+    pub delivery_service: DeliveryServiceLevel,
     pub stockout_rate: f64,
     pub avg_delivery_time: f64,
     pub quarterly_logistics_cost: f64,
@@ -328,6 +430,7 @@ impl SupplyChainState {
             suppliers: vec![],
             logistics: LogisticsLevel::Basic,
             warehouse: WarehouseTier::None,
+            delivery_service: DeliveryServiceLevel::None,
             stockout_rate: 15.0,
             avg_delivery_time: 2.5,
             quarterly_logistics_cost: 0.0,
@@ -581,10 +684,54 @@ pub fn upgrade_warehouse(
     Ok(setup_cost)
 }
 
+pub fn upgrade_delivery_service(
+    state: &mut GameState,
+    new_level: DeliveryServiceLevel,
+) -> Result<f64, &'static str> {
+    let current_ord = state.supply_chain.delivery_service as u8;
+    let new_ord = new_level as u8;
+
+    if new_level == state.supply_chain.delivery_service {
+        return Err("Already at this delivery service level.");
+    }
+
+    if new_level == DeliveryServiceLevel::None {
+        state.supply_chain.delivery_service = DeliveryServiceLevel::None;
+        state.push_message("Delivery service deactivated.".into());
+        return Ok(0.0);
+    }
+
+    if new_ord != current_ord + 1 {
+        return Err("You can only upgrade one delivery service level at a time.");
+    }
+
+    let operating = state.operating_store_count();
+    if operating < new_level.min_stores() {
+        return Err("Not enough operating stores for this delivery service level.");
+    }
+
+    let setup_cost = new_level.setup_cost();
+    if state.company.cash < setup_cost {
+        return Err("Not enough cash for delivery service upgrade.");
+    }
+
+    state.company.cash -= setup_cost;
+    state.supply_chain.delivery_service = new_level;
+    state.push_message(format!(
+        "Upgraded delivery service to {}! Setup cost: {}. Quarterly operating cost: {}.",
+        new_level.label(),
+        super::state::format_currency(setup_cost),
+        super::state::format_currency(new_level.quarterly_cost()),
+    ));
+
+    Ok(setup_cost)
+}
+
 pub fn process_supply_chain(state: &mut GameState) -> f64 {
     let mut total_cost = 0.0;
     total_cost += state.supply_chain.logistics.quarterly_cost();
     total_cost += state.supply_chain.warehouse.quarterly_cost();
+    total_cost += state.supply_chain.delivery_service.quarterly_cost();
 
     let csco_skill = state
         .executives

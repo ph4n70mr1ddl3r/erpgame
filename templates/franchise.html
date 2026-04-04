@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1 style="font-size: 1.5rem; font-weight: 700; margin-bottom: 0.25rem;">Franchise Management</h1>
+<p style="color: #64748b; margin-bottom: 1rem;">Convert company-owned stores into franchises. Receive an upfront franchise fee and ongoing royalties based on store revenue. Buy back franchises to regain full control.</p>
+
+{% if messages.len() > 0 %}
+<div style="margin-bottom: 1rem;">
+    {% for msg in messages %}
+    <div class="message msg-info">{{ msg }}</div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+    <div class="stat-card">
+        <div style="font-size: 0.75rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em;">Active Franchises</div>
+        <div style="font-size: 1.5rem; font-weight: 700; margin-top: 0.25rem;">{{ active_count }}</div>
+    </div>
+    <div class="stat-card">
+        <div style="font-size: 0.75rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em;">Total Fees Received</div>
+        <div style="font-size: 1.25rem; font-weight: 700; margin-top: 0.25rem; color: #22c55e;">{{ total_fees_received }}</div>
+    </div>
+    <div class="stat-card">
+        <div style="font-size: 0.75rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em;">Total Royalties</div>
+        <div style="font-size: 1.25rem; font-weight: 700; margin-top: 0.25rem; color: #3b82f6;">{{ total_royalties }}</div>
+    </div>
+    <div class="stat-card">
+        <div style="font-size: 0.75rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em;">Quarterly Royalties</div>
+        <div style="font-size: 1.25rem; font-weight: 700; margin-top: 0.25rem; color: #f59e0b;">{{ quarterly_royalty_income }}</div>
+    </div>
+</div>
+
+{% if franchises.len() > 0 %}
+<h2 style="font-size: 1.1rem; font-weight: 600; margin-bottom: 0.75rem;">Active Franchises</h2>
+<div style="overflow-x: auto; margin-bottom: 1.5rem;">
+    <table>
+        <thead>
+            <tr>
+                <th>Store</th>
+                <th>City</th>
+                <th>Type</th>
+                <th>Franchisee</th>
+                <th>Royalty</th>
+                <th>Quarters</th>
+                <th>Total Royalties</th>
+                <th>Q Royalty</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for f in franchises %}
+            <tr>
+                <td>{{ f.store_name }}</td>
+                <td>{{ f.city }}</td>
+                <td>{{ f.store_type }}</td>
+                <td>{{ f.franchisee_name }}</td>
+                <td>{{ f.royalty_rate }}</td>
+                <td>{{ f.quarters_active }}</td>
+                <td style="color: #3b82f6;">{{ f.total_royalties }}</td>
+                <td style="color: #22c55e;">{{ f.quarterly_royalty }}</td>
+                <td>
+                    <form action="/franchise/buyback" method="POST" style="margin: 0;">
+                        <input type="hidden" name="franchise_id" value="{{ f.id }}">
+                        <button type="submit" class="btn-warning btn-sm">Buy Back ({{ f.buyback_cost }})</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+
+{% if eligible_stores.len() > 0 %}
+<h2 style="font-size: 1.1rem; font-weight: 600; margin-bottom: 0.75rem;">Eligible Stores</h2>
+<p style="color: #64748b; font-size: 0.85rem; margin-bottom: 0.75rem;">Company-owned stores that can be converted to franchises.</p>
+
+<div style="overflow-x: auto;">
+    <table>
+        <thead>
+            <tr>
+                <th>Store</th>
+                <th>City</th>
+                <th>Type</th>
+                <th>Q Revenue</th>
+                <th>Franchise Fee</th>
+                <th>Royalty Rate</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for s in eligible_stores %}
+            <tr>
+                <td>{{ s.name }}</td>
+                <td>{{ s.city }}</td>
+                <td>{{ s.store_type }}</td>
+                <td>{{ s.quarterly_revenue }}</td>
+                <td style="color: #22c55e;">{{ s.franchise_fee }}</td>
+                <td>{{ s.royalty_rate }}</td>
+                <td>
+                    {% if s.can_franchise %}
+                    <form action="/franchise/create" method="POST" style="margin: 0;">
+                        <input type="hidden" name="store_id" value="{{ s.id }}">
+                        <button type="submit" class="btn-primary btn-sm">Franchise</button>
+                    </form>
+                    {% else if s.show_reason %}
+                    <span style="font-size: 0.75rem; color: #ef4444;">{{ s.reason }}</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div style="text-align: center; padding: 2rem; color: #64748b;">
+    <p>No stores available for franchising.</p>
+</div>
+{% endif %}
+
+<div style="margin-top: 1.5rem; padding: 1rem; background: #1e293b; border-radius: 0.5rem; border: 1px solid #334155;">
+    <h3 style="font-size: 0.95rem; font-weight: 600; margin-bottom: 0.5rem;">How Franchising Works</h3>
+    <ul style="color: #94a3b8; font-size: 0.85rem; margin: 0; padding-left: 1.25rem;">
+        <li style="margin-bottom: 0.25rem;"><strong style="color: #e2e8f0;">Franchise Fee:</strong> One-time upfront payment when you convert a store to a franchise.</li>
+        <li style="margin-bottom: 0.25rem;"><strong style="color: #e2e8f0;">Royalties:</strong> Ongoing quarterly payments based on a percentage of store revenue.</li>
+        <li style="margin-bottom: 0.25rem;"><strong style="color: #e2e8f0;">Less Control:</strong> Franchised stores generate passive income but you have less operational control.</li>
+        <li style="margin-bottom: 0.25rem;"><strong style="color: #e2e8f0;">Buy Back:</strong> Purchase the franchise back at 70% of the franchise fee to regain full control.</li>
+        <li><strong style="color: #e2e8f0;">Requirement:</strong> You must keep at least one company-owned store.</li>
+    </ul>
+</div>
+
+<div style="margin-top: 1.5rem; text-align: center; font-size: 0.8rem; color: #64748b;">
+    Cash on hand: <span style="color: #e2e8f0;">{{ cash }}</span>
+</div>
+{% endblock %}

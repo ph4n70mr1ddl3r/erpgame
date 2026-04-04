@@ -10,6 +10,7 @@ use super::competitors::{
 use super::csr::{csr_tax_deduction, process_csr};
 use super::ecommerce::process_ecommerce;
 use super::events::{generate_auto_events, generate_pending_events};
+use super::franchise::process_franchise_revenue;
 use super::loyalty::{loyalty_revenue_multiplier, update_loyalty};
 use super::private_label::process_private_labels;
 use super::products::{
@@ -81,10 +82,12 @@ pub fn simulate_quarter(state: &mut GameState) {
     let ecommerce_cost = process_ecommerce(state);
     let supply_chain_cost = process_supply_chain(state);
     let private_label_net = process_private_labels(state, &mut rng);
+    let franchise_royalties = process_franchise_revenue(state);
     let online_revenue = state.ecommerce.quarterly_online_revenue;
     let pl_revenue = super::private_label::private_label_revenue(state);
     let ad_revenue = super::ad_campaigns::total_ad_revenue(state);
-    let total_revenue = total_revenue + online_revenue + pl_revenue + ad_revenue;
+    let total_revenue =
+        total_revenue + online_revenue + pl_revenue + ad_revenue + franchise_royalties;
     let total_expenses = calculate_expenses(state, operating_count, cto_skill);
     let loyalty_cost = update_loyalty(state);
     process_campaigns(state);

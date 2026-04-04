@@ -72,6 +72,9 @@ async fn main() {
         .route("/ad-campaigns", get(api::routes::ad_campaigns_page))
         .route("/ad-campaigns/launch", post(api::routes::launch_ad_campaign_route))
         .route("/ad-campaigns/cancel", post(api::routes::cancel_ad_campaign_route))
+        .route("/franchise", get(api::routes::franchise_page))
+        .route("/franchise/create", post(api::routes::franchise_store_route))
+        .route("/franchise/buyback", post(api::routes::buyback_franchise_route))
         .with_state(game_state)
         .nest_service("/static", ServeDir::new("static"));
 

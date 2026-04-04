@@ -9,6 +9,7 @@ pub mod economy;
 pub mod employees;
 pub mod events;
 pub mod executive_ai;
+pub mod franchise;
 pub mod loyalty;
 pub mod private_label;
 pub mod products;

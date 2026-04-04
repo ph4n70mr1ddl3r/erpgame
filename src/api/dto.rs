@@ -691,3 +691,42 @@ pub struct AdCampaignOption {
     pub reason: String,
     pub show_reason: bool,
 }
+
+#[derive(Debug, Serialize)]
+pub struct FranchiseRow {
+    pub id: String,
+    pub store_name: String,
+    pub city: String,
+    pub store_type: String,
+    pub franchisee_name: String,
+    pub royalty_rate: String,
+    pub quarters_active: i32,
+    pub total_royalties: String,
+    pub quarterly_royalty: String,
+    pub status: String,
+    pub buyback_cost: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct EligibleStoreRow {
+    pub id: String,
+    pub name: String,
+    pub city: String,
+    pub store_type: String,
+    pub quarterly_revenue: String,
+    pub franchise_fee: String,
+    pub royalty_rate: String,
+    pub can_franchise: bool,
+    pub reason: String,
+    pub show_reason: bool,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct FranchiseForm {
+    pub store_id: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct BuybackForm {
+    pub franchise_id: String,
+}

@@ -60,6 +60,8 @@ pub struct GameState {
     pub csr: super::csr::CsrState,
     #[serde(default)]
     pub ad_campaigns: super::ad_campaigns::AdCampaignState,
+    #[serde(default)]
+    pub franchise: super::franchise::FranchiseState,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -983,6 +985,7 @@ impl GameState {
             research_lab: super::research::ResearchLab::new(),
             csr: super::csr::CsrState::new(),
             ad_campaigns: super::ad_campaigns::AdCampaignState::new(),
+            franchise: super::franchise::FranchiseState::new(),
         }
     }
 

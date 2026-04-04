@@ -2109,3 +2109,103 @@ pub async fn cancel_ad_campaign_route(State(state): State<AppState>, Form(form):
     }
     Redirect::to("/ad-campaigns").into_response()
 }
+
+pub async fn franchise_page(State(state): State<AppState>) -> Response {
+    let state = state.lock().await;
+    let s = &*state;
+    let fs = &s.franchise;
+
+    let franchise_rows: Vec<crate::api::dto::FranchiseRow> = fs.franchises.iter().filter(|f| f.status == crate::game::franchise::FranchiseStatus::Active).map(|f| {
+        let store = s.stores.iter().find(|st| st.id == f.store_id);
+        let quarterly_royalty = store.map(|st| f.quarterly_royalty(st.quarterly_revenue)).unwrap_or(0.0);
+        crate::api::dto::FranchiseRow {
+            id: f.id.clone(),
+            store_name: f.store_name.clone(),
+            city: f.city.clone(),
+            store_type: f.store_type.label().to_string(),
+            franchisee_name: f.franchisee_name.clone(),
+            royalty_rate: format!("{:.1}%", f.royalty_rate * 100.0),
+            quarters_active: f.quarters_active,
+            total_royalties: format_currency(f.total_royalties_paid),
+            quarterly_royalty: format_currency(quarterly_royalty),
+            status: f.status.label().to_string(),
+            buyback_cost: format_currency(crate::game::franchise::buyback_cost(f.store_type)),
+        }
+    }).collect();
+
+    let franchise_store_ids: std::collections::HashSet<String> = fs.franchises.iter()
+        .filter(|f| f.status == crate::game::franchise::FranchiseStatus::Active)
+        .map(|f| f.store_id.clone())
+        .collect();
+
+    let operating_count = s.stores.iter().filter(|st| st.status == StoreStatus::Operating).count();
+    let franchise_count = franchise_store_ids.len();
+    let company_owned = operating_count - franchise_count;
+
+    let eligible_stores: Vec<crate::api::dto::EligibleStoreRow> = s.stores.iter()
+        .filter(|st| st.status == StoreStatus::Operating && !franchise_store_ids.contains(&st.id))
+        .map(|st| {
+            let fee = crate::game::franchise::franchise_fee(st.store_type);
+            let royalty = crate::game::franchise::royalty_rate(st.store_type);
+            let (can_franchise, reason, show_reason) = if company_owned <= 1 {
+                (false, "Must keep at least one company-owned store".into(), true)
+            } else {
+                (true, String::new(), false)
+            };
+            crate::api::dto::EligibleStoreRow {
+                id: st.id.clone(),
+                name: st.name.clone(),
+                city: st.city.clone(),
+                store_type: st.store_type.label().to_string(),
+                quarterly_revenue: format_currency(st.quarterly_revenue),
+                franchise_fee: format_currency(fee),
+                royalty_rate: format!("{:.1}%", royalty * 100.0),
+                can_franchise,
+                reason,
+                show_reason,
+            }
+        }).collect();
+
+    let quarterly_royalty_income: f64 = fs.franchises.iter()
+        .filter(|f| f.status == crate::game::franchise::FranchiseStatus::Active)
+        .filter_map(|f| {
+            let store = s.stores.iter().find(|st| st.id == f.store_id)?;
+            Some(f.quarterly_royalty(store.quarterly_revenue))
+        })
+        .sum();
+
+    crate::templates::FranchiseTemplate {
+        franchises: franchise_rows,
+        eligible_stores,
+        active_count: fs.active_count(),
+        total_fees_received: format_currency(fs.total_franchise_fees_received),
+        total_royalties: format_currency(fs.total_royalties_received),
+        quarterly_royalty_income: format_currency(quarterly_royalty_income),
+        cash: format_currency_full(s.company.cash),
+        messages: s.messages_vec(),
+        current_quarter: s.current_quarter_label(),
+        active_page: "franchise".to_string(),
+    }.into_response()
+}
+
+pub async fn franchise_store_route(State(state): State<AppState>, Form(form): Form<super::dto::FranchiseForm>) -> Response {
+    let mut state = state.lock().await;
+    match crate::game::franchise::franchise_store(&mut state, &form.store_id) {
+        Ok(_fee) => {}
+        Err(msg) => {
+            state.push_message(msg.to_string());
+        }
+    }
+    Redirect::to("/franchise").into_response()
+}
+
+pub async fn buyback_franchise_route(State(state): State<AppState>, Form(form): Form<super::dto::BuybackForm>) -> Response {
+    let mut state = state.lock().await;
+    match crate::game::franchise::buyback_franchise(&mut state, &form.franchise_id) {
+        Ok(_cost) => {}
+        Err(msg) => {
+            state.push_message(msg.to_string());
+        }
+    }
+    Redirect::to("/franchise").into_response()
+}

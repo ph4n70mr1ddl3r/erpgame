@@ -360,3 +360,18 @@ pub struct AdCampaignsTemplate {
     pub current_quarter: String,
     pub active_page: String,
 }
+
+#[derive(Template)]
+#[template(path = "franchise.html")]
+pub struct FranchiseTemplate {
+    pub franchises: Vec<crate::api::dto::FranchiseRow>,
+    pub eligible_stores: Vec<crate::api::dto::EligibleStoreRow>,
+    pub active_count: usize,
+    pub total_fees_received: String,
+    pub total_royalties: String,
+    pub quarterly_royalty_income: String,
+    pub cash: String,
+    pub messages: Vec<String>,
+    pub current_quarter: String,
+    pub active_page: String,
+}

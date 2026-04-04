@@ -1751,33 +1751,27 @@ pub async fn employees_page(State(state): State<AppState>) -> Response {
         let store_name = if let Some(ref store_id) = emp.store_id {
             s.stores.iter()
                 .find(|st| &st.id == store_id)
-                .map(|st| format!("{} - {}", st.name, st.city))
+                .map(|st| format!("{} - {}", st.name, st.city)
                 .unwrap_or_else(|| "Unknown Store".to_string())
         } else {
             "Corporate HQ".to_string()
         };
 
-        let morale_class = if emp.morale >= 70.0 { "text-green-400" } else if emp.morale >= 50.0 { "text-yellow-400" } else { "text-red-400" };
-        let performance_class = if emp.performance_rating >= 70.0 { "text-green-400" } else if emp.performance_rating >= 50.0 { "text-yellow-400" } else { "text-red-400" };
-        let tenure = if emp.tenure_quarters < 4 { format!("{} Q", emp.tenure_quarters) } else { format!("{} Y", emp.tenure_quarters / 4) };
-
-        employee_rows.push(EmployeeRow {
-            id: emp.id.clone(),
-            name: emp.name.clone(),
-            role_key: emp.role.key().to_string(),
-            role_name: emp.role.label().to_string(),
-            category: emp.role.category().label().to_string(),
-            store_name,
-            salary_monthly: format_currency_full(emp.salary_monthly),
-            skill: format!("{:.0}/100", emp.skill),
-            morale: format!("{:.0}%", emp.morale),
-            morale_class: morale_class.to_string(),
-            performance: format!("{:.0}/100", emp.performance_rating),
-            performance_class: performance_class.to_string(),
-            tenure,
-            training_count: emp.training_count,
+        let morale_class = if emp.morale >= 70.0 { "text-green-400" } else if emp.morale >= 50.0 { "text-yellow-400" } else { "text-red-400" });
+            } else {
+                "text-green-400".to_string()
+            }
         });
     }
+
+    let stats = EmployeeStats {
+        total_count: s.employee_system.total_count
+        monthly_payroll: format_currency_full(s.employee_system.monthly_payroll)
+        avg_morale: format!("{:.1}%", s.employee_system.avg_morale)
+        avg_skill: format!("{:.1}%", s.employee_system.avg_skill)
+        turnover_rate: format!("{:.1}%", s.employee_system.turnover_rate)
+    };
+}
 
     let mut role_options: Vec<RoleOption> = Vec::new();
     for role in super::employees::EmployeeRole::all_roles() {

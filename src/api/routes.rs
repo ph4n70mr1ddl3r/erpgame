@@ -22,10 +22,11 @@ use crate::game::{
         SeasonalPromotionType, get_available_promotions_for_quarter,
         activate_promotion, seasonal_revenue_multiplier,
     },
+    research::{ResearchTrack, start_research, cancel_research},
     supply_chain::{
-        SupplierCategory, LogisticsLevel, WarehouseTier,
+        SupplierCategory, LogisticsLevel, WarehouseTier, DeliveryServiceLevel,
         available_supplier_categories, negotiate_supplier, terminate_supplier,
-        upgrade_logistics, upgrade_warehouse,
+        upgrade_logistics, upgrade_warehouse, upgrade_delivery_service,
     },
 };
 use super::dto::*;
@@ -1142,7 +1143,43 @@ pub async fn supply_chain_page(State(state): State<AppState>) -> Response {
         }
     }).collect();
 
-    let total_quarterly_cost = sc.logistics.quarterly_cost() + sc.warehouse.quarterly_cost();
+    let delivery_service_levels: Vec<DeliveryServiceLevelRow> = DeliveryServiceLevel::all_levels().iter().map(|l| {
+        let is_current = *l == sc.delivery_service;
+        let can_afford = s.company.cash >= l.setup_cost();
+        let has_stores = s.operating_store_count() >= l.min_stores();
+        let current_ord = sc.delivery_service as u8;
+        let new_ord = *l as u8;
+        let is_next = new_ord == current_ord + 1;
+        let (can_select, reason, show_reason) = if is_current {
+            (false, String::new(), false)
+        } else if *l == DeliveryServiceLevel::None && sc.delivery_service != DeliveryServiceLevel::None {
+            (true, String::new(), false)
+        } else if !has_stores {
+            (false, format!("Need {} stores", l.min_stores()), true)
+        } else if !can_afford {
+            (false, format!("Need {}", format_currency(l.setup_cost())), true)
+        } else if !is_next && *l != DeliveryServiceLevel::None {
+            (false, "Upgrade one level at a time".into(), true)
+        } else {
+            (true, String::new(), false)
+        };
+        DeliveryServiceLevelRow {
+            key: l.key().to_string(),
+            name: l.label().to_string(),
+            description: l.description().to_string(),
+            setup_cost: if l.setup_cost() > 0.0 { format_currency(l.setup_cost()) } else { "Free".into() },
+            quarterly_cost: if l.quarterly_cost() > 0.0 { format_currency(l.quarterly_cost()) } else { "-".into() },
+            revenue_bonus: format!("+{:.0}%", l.revenue_bonus() * 100.0),
+            satisfaction_bonus: format!("+{:.0}", l.satisfaction_bonus()),
+            min_stores: l.min_stores(),
+            is_current,
+            can_select,
+            show_reason,
+            reason,
+        }
+    }).collect();
+
+    let total_quarterly_cost = sc.logistics.quarterly_cost() + sc.warehouse.quarterly_cost() + sc.delivery_service.quarterly_cost();
 
     crate::templates::SupplyChainTemplate {
         supplier_rows,
@@ -1151,6 +1188,7 @@ pub async fn supply_chain_page(State(state): State<AppState>) -> Response {
         max_suppliers: 8,
         logistics_levels,
         warehouse_tiers,
+        delivery_service_levels,
         stockout_rate: format!("{:.1}%", sc.stockout_rate),
         avg_delivery_time: format!("{:.1} Q", sc.avg_delivery_time),
         quarterly_logistics_cost: format_currency(sc.quarterly_logistics_cost),
@@ -1223,6 +1261,24 @@ pub async fn upgrade_warehouse_route(State(state): State<AppState>, Form(form): 
         }
     };
     match upgrade_warehouse(&mut state, new_tier) {
+        Ok(_) => {}
+        Err(msg) => {
+            state.push_message(msg.to_string());
+        }
+    }
+    Redirect::to("/supply-chain").into_response()
+}
+
+pub async fn upgrade_delivery_service_route(State(state): State<AppState>, Form(form): Form<DeliveryForm>) -> Response {
+    let mut state = state.lock().await;
+    let new_level = match DeliveryServiceLevel::from_key(&form.level) {
+        Some(l) => l,
+        None => {
+            state.push_message("Invalid delivery service level.".into());
+            return Redirect::to("/supply-chain").into_response();
+        }
+    };
+    match upgrade_delivery_service(&mut state, new_level) {
         Ok(_) => {}
         Err(msg) => {
             state.push_message(msg.to_string());
@@ -1468,4 +1524,110 @@ pub async fn activate_seasonal_promo(
         }
     }
     Redirect::to("/seasonal").into_response()
+}
+
+pub async fn research_page(State(state): State<AppState>) -> Response {
+    let state = state.lock().await;
+    let s = &*state;
+    let lab = &s.research_lab;
+
+    let active = lab.active_research();
+    let has_active = active.is_some();
+    let active_track_name = active.map(|p| p.track.label().to_string()).unwrap_or_default();
+    let active_progress = active.map(|p| p.progress).unwrap_or(0.0);
+    let active_quarters_remaining = active.map(|p| p.quarters_remaining).unwrap_or(0);
+
+    let cto_skill = s.executives.iter().find(|e| e.position == ExecutivePosition::CTO).map(|e| format!("{:.0}/100", e.skill)).unwrap_or_else(|| "Not hired".into());
+
+    let tracks: Vec<super::dto::ResearchTrackRow> = ResearchTrack::all_tracks().iter().map(|track| {
+        let project = lab.get_project(*track);
+        let current_level = project.map(|p| p.current_level).unwrap_or(0);
+        let progress = project.map(|p| p.progress).unwrap_or(0.0);
+        let quarters_remaining = project.map(|p| p.quarters_remaining).unwrap_or(0);
+        let is_researching = project.map(|p| p.is_researching).unwrap_or(false);
+        let max_level = track.max_level();
+        let next_level = current_level + 1;
+        let next_cost = if next_level <= max_level { format_currency(track.cost_per_level(current_level)) } else { "-".into() };
+        let next_quarters = if next_level <= max_level { track.quarters_per_level(current_level) } else { 0 };
+        let can_afford = s.company.cash >= track.cost_per_level(current_level);
+        let has_stores = s.operating_store_count() >= track.min_stores();
+        let (can_start, reason, show_reason) = if is_researching {
+            (false, "Currently researching".into(), true)
+        } else if has_active {
+            (false, "Another project in progress".into(), true)
+        } else if current_level >= max_level {
+            (false, "Fully researched".into(), false)
+        } else if !has_stores {
+            (false, format!("Need {} stores", track.min_stores()), true)
+        } else if !can_afford {
+            (false, format!("Need {}", format_currency(track.cost_per_level(current_level))), true)
+        } else {
+            (true, String::new(), false)
+        };
+        super::dto::ResearchTrackRow {
+            key: track.key().to_string(),
+            name: track.label().to_string(),
+            icon: track.icon().to_string(),
+            color_class: track.color_class().to_string(),
+            description: track.description().to_string(),
+            current_level,
+            max_level,
+            progress,
+            progress_pct: format!("{:.1}", progress * 100.0),
+            quarters_remaining,
+            is_researching,
+            effect_description: track.effect_description(current_level),
+            next_cost,
+            next_quarters,
+            can_start,
+            reason,
+            show_reason,
+            min_stores: track.min_stores(),
+        }
+    }).collect();
+
+    crate::templates::ResearchTemplate {
+        tracks,
+        has_active,
+        active_track_name,
+        active_progress,
+        active_progress_pct: format!("{:.1}", active_progress * 100.0),
+        active_quarters_remaining,
+        total_invested: format_currency(lab.total_invested),
+        completed_count: lab.completed_count,
+        cto_skill,
+        cash: format_currency_full(s.company.cash),
+        messages: s.messages_vec(),
+        current_quarter: s.current_quarter_label(),
+        active_page: "research".to_string(),
+    }.into_response()
+}
+
+pub async fn start_research_route(State(state): State<AppState>, Form(form): Form<super::dto::ResearchForm>) -> Response {
+    let mut state = state.lock().await;
+    let track = match ResearchTrack::from_key(&form.track) {
+        Some(t) => t,
+        None => {
+            state.push_message("Invalid research track.".into());
+            return Redirect::to("/research").into_response();
+        }
+    };
+    match start_research(&mut state, track) {
+        Ok(_cost) => {}
+        Err(msg) => {
+            state.push_message(msg.to_string());
+        }
+    }
+    Redirect::to("/research").into_response()
+}
+
+pub async fn cancel_research_route(State(state): State<AppState>) -> Response {
+    let mut state = state.lock().await;
+    match cancel_research(&mut state) {
+        Ok(_) => {}
+        Err(msg) => {
+            state.push_message(msg.to_string());
+        }
+    }
+    Redirect::to("/research").into_response()
 }

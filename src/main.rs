@@ -52,11 +52,15 @@ async fn main() {
         .route("/supply-chain/suppliers/{id}/terminate", post(api::routes::terminate_supplier_route))
         .route("/supply-chain/logistics", post(api::routes::upgrade_logistics_route))
         .route("/supply-chain/warehouse", post(api::routes::upgrade_warehouse_route))
+        .route("/supply-chain/delivery", post(api::routes::upgrade_delivery_service_route))
         .route("/private-label", get(api::routes::private_label_page))
         .route("/private-label/develop", post(api::routes::start_private_label))
         .route("/seasonal", get(api::routes::seasonal_page))
         .route("/seasonal/activate", post(api::routes::activate_seasonal_promo))
         .route("/achievements", get(api::routes::achievements_page))
+        .route("/research", get(api::routes::research_page))
+        .route("/research/start", post(api::routes::start_research_route))
+        .route("/research/cancel", post(api::routes::cancel_research_route))
         .with_state(game_state)
         .nest_service("/static", ServeDir::new("static"));
 

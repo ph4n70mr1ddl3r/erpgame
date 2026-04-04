@@ -413,6 +413,27 @@ pub struct WarehouseForm {
     pub tier: String,
 }
 
+#[derive(Debug, Serialize)]
+pub struct DeliveryServiceLevelRow {
+    pub key: String,
+    pub name: String,
+    pub description: String,
+    pub setup_cost: String,
+    pub quarterly_cost: String,
+    pub revenue_bonus: String,
+    pub satisfaction_bonus: String,
+    pub min_stores: u32,
+    pub is_current: bool,
+    pub can_select: bool,
+    pub show_reason: bool,
+    pub reason: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct DeliveryForm {
+    pub level: String,
+}
+
 #[derive(Debug, Deserialize)]
 pub struct PrivateLabelForm {
     pub category_id: String,
@@ -481,4 +502,31 @@ pub struct SeasonalPromoOption {
 #[derive(Debug, Deserialize)]
 pub struct SeasonalPromoForm {
     pub promotion_type: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ResearchForm {
+    pub track: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct ResearchTrackRow {
+    pub key: String,
+    pub name: String,
+    pub icon: String,
+    pub color_class: String,
+    pub description: String,
+    pub current_level: u32,
+    pub max_level: u32,
+    pub progress: f64,
+    pub progress_pct: String,
+    pub quarters_remaining: i32,
+    pub is_researching: bool,
+    pub effect_description: String,
+    pub next_cost: String,
+    pub next_quarters: i32,
+    pub can_start: bool,
+    pub reason: String,
+    pub show_reason: bool,
+    pub min_stores: u32,
 }

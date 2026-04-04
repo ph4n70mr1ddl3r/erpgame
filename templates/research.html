@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1 style="font-size: 1.5rem; font-weight: 700; margin-bottom: 0.25rem;">Research Lab</h1>
+<p style="color: #64748b; margin-bottom: 1rem;">Invest in R&D to unlock permanent bonuses across your company. Only one project can be active at a time. Your CTO's skill speeds up research progress.</p>
+
+</div>
+
+</div>
+
+{% if messages.len() > 0 %}
+<div style="margin-bottom: 1rem;">
+    {% for msg in messages %}
+    <div class="message msg-info">{{ msg }}</div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+    <div class="stat-card">
+        <div style="font-size: 0.75rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em;">Total Invested</div>
+        <div style="font-size: 1.25rem; font-weight: 700; margin-top: 0.25rem; color: #f59e0b;">{{ total_invested }}</div>
+    </div>
+    <div class="stat-card">
+        <div style="font-size: 0.75rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em;">Completed Projects</div>
+        <div style="font-size: 1.5rem; font-weight: 700; margin-top: 0.25rem;">{{ completed_count }}</div>
+    </div>
+    <div class="stat-card">
+        <div style="font-size: 0.75rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em;">CTO Skill</div>
+        <div style="font-size: 0.7rem; color: #64748b; margin-top: 0.15rem;">Speeds up research</div>
+    </div>
+    {% if has_active %}
+    <div class="stat-card">
+        <div style="font-size: 0.75rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em;">Active Research</div>
+        <div style="font-size: 1rem; font-weight: 700; margin-top: 0.25rem; color: #a78bfa;">{{ active_track_name }}</div>
+        <div class="progress-bar" style="margin-top: 0.5rem; height: 0.6rem;">
+            <div class="progress-fill" style="width: {{ active_progress_pct }}%; background: #a78bfa;"></div>
+        </div>
+        <div style="font-size: 0.7rem; color: #94a3b8; margin-top: 0.25rem;">{{ active_quarters_remaining }} quarter(s) left</div>
+        <form action="/research/cancel" method="POST" style="margin-top: 0.5rem;">
+            <button type="submit" class="btn-danger btn-sm" style="width: 100%;">Cancel Research</button>
+        </form>
+    </div>
+    {% endif %}
+</div>
+
+<h2 style="font-size: 1.1rem; font-weight: 600; margin-bottom: 0.75rem;">Research Tracks</h2>
+
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1rem;">
+    {% for track in tracks %}
+    <div class="card" style="padding: 1rem; {% if track.is_researching %}border-left: 4px solid #a78bfa;{% endif %}">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+            <h3 style="font-size: 1rem; font-weight: 600;" class="{{ track.color_class }}">{{ track.name }}</h3>
+            <span style="font-size: 0.7rem; background: #334155; color: #e2e8f0; padding: 0.15rem 0.5rem; border-radius: 0.25rem;">Level {{ track.current_level }}/{{ track.max_level }}</span>
+        </div>
+        <p style="font-size: 0.8rem; color: #94a3b8; margin-bottom: 0.75rem;">{{ track.description }}</p>
+
+        {% if track.is_researching %}
+        <div style="margin-bottom: 0.5rem;">
+            <div class="progress-bar" style="height: 0.5rem;">
+                <div class="progress-fill" style="width: {{ track.progress_pct }}%; background: #a78bfa;"></div>
+            </div>
+            <div style="font-size: 0.7rem; color: #94a3b8; margin-top: 0.25rem;">{{ track.progress_pct }}% - {{ track.quarters_remaining }} quarter(s) remaining</div>
+        </div>
+        {% endif %}
+        <div style="font-size: 0.8rem; color: #64748b; margin-bottom: 0.5rem;">
+            <div>Current Effect: <span style="color: #22c55e;">{{ track.effect_description }}</span></div>
+            {% if track.current_level < track.max_level %}
+            <div>Next Level Cost: <span style="color: #f59e0b;">{{ track.next_cost }}</span></div>
+            <div>Est. Duration: <span style="color: #e2e8f0;">{{ track.next_quarters }} quarter(s)</span></div>
+            {% endif %}
+            <div>Min. Stores: <span style="color: #e2e8f0;">{{ track.min_stores }}</span></div>
+        </div>
+        {% if track.can_start %}
+        <form action="/research/start" method="POST" style="margin-top: 0.5rem;">
+            <input type="hidden" name="track" value="{{ track.key }}">
+            <button type="submit" class="btn-primary btn-sm" style="width: 100%;">Start Research ({{ track.next_cost }})</button>
+        </form>
+        {% else if track.show_reason %}
+        <div style="font-size: 0.75rem; color: #ef4444; margin-top: 0.5rem; text-align: center;">{{ track.reason }}</div>
+        {% endif %}
+    </div>
+    {% endfor %}
+</div>
+
+<div style="margin-top: 1.5rem; text-align: center; font-size: 0.8rem; color: #64748b;">
+    Cash on hand: <span style="color: #e2e8f0;">{{ cash }}</span>
+</div>
+
+{% endblock %}

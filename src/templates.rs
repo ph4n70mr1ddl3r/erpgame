@@ -247,6 +247,7 @@ pub struct SupplyChainTemplate {
     pub max_suppliers: usize,
     pub logistics_levels: Vec<crate::api::dto::LogisticsLevelRow>,
     pub warehouse_tiers: Vec<crate::api::dto::WarehouseTierRow>,
+    pub delivery_service_levels: Vec<crate::api::dto::DeliveryServiceLevelRow>,
     pub stockout_rate: String,
     pub avg_delivery_time: String,
     #[allow(dead_code)]
@@ -289,6 +290,24 @@ pub struct SeasonalTemplate {
     pub active_count: usize,
     pub effective_revenue_bonus: String,
     pub cmo_skill: String,
+    pub cash: String,
+    pub messages: Vec<String>,
+    pub current_quarter: String,
+    pub active_page: String,
+}
+
+#[derive(Template)]
+#[template(path = "research.html")]
+pub struct ResearchTemplate {
+    pub tracks: Vec<crate::api::dto::ResearchTrackRow>,
+    pub has_active: bool,
+    pub active_track_name: String,
+    pub active_progress: f64,
+    pub active_progress_pct: String,
+    pub active_quarters_remaining: i32,
+    pub total_invested: String,
+    pub completed_count: u32,
+    pub cto_skill: String,
     pub cash: String,
     pub messages: Vec<String>,
     pub current_quarter: String,

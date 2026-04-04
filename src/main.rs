@@ -75,6 +75,8 @@ async fn main() {
         .route("/franchise", get(api::routes::franchise_page))
         .route("/franchise/create", post(api::routes::franchise_store_route))
         .route("/franchise/buyback", post(api::routes::buyback_franchise_route))
+        .route("/employees/benefits/activate", post(api::routes::activate_benefit_route))
+        .route("/employees/benefits/deactivate", post(api::routes::deactivate_benefit_route))
         .with_state(game_state)
         .nest_service("/static", ServeDir::new("static"));
 

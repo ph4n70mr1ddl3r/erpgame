@@ -339,6 +339,8 @@ pub struct EmployeesTemplate {
     pub training_options: Vec<crate::api::dto::TrainingOptionRow>,
     pub stats: crate::api::dto::EmployeeStats,
     pub stores: Vec<crate::api::dto::StoreRow>,
+    pub benefits: Vec<crate::api::dto::BenefitRow>,
+    pub benefits_summary: crate::api::dto::BenefitsSummary,
     pub cash: String,
     pub messages: Vec<String>,
     pub current_quarter: String,

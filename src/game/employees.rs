@@ -624,3 +624,254 @@ pub fn employee_salary_by_role(employees: &[Employee], role: EmployeeRole) -> f6
 pub fn employee_count_by_role(employees: &[Employee], role: EmployeeRole) -> u32 {
     employees.iter().filter(|e| e.role == role).count() as u32
 }
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
+pub enum BenefitType {
+    HealthInsurance,
+    DentalVision,
+    LifeInsurance,
+    RetirementPlan,
+    PaidTimeOff,
+    EducationAssistance,
+    WellnessProgram,
+    TransportationAllowance,
+    MealAllowance,
+    PerformanceBonus,
+}
+
+impl BenefitType {
+    pub fn label(&self) -> &str {
+        match self {
+            BenefitType::HealthInsurance => "Health Insurance",
+            BenefitType::DentalVision => "Dental & Vision",
+            BenefitType::LifeInsurance => "Life Insurance",
+            BenefitType::RetirementPlan => "Retirement Plan (401k)",
+            BenefitType::PaidTimeOff => "Extended Paid Time Off",
+            BenefitType::EducationAssistance => "Education Assistance",
+            BenefitType::WellnessProgram => "Wellness Program",
+            BenefitType::TransportationAllowance => "Transportation Allowance",
+            BenefitType::MealAllowance => "Meal Allowance",
+            BenefitType::PerformanceBonus => "Performance Bonus Scheme",
+        }
+    }
+
+    pub fn key(&self) -> &str {
+        match self {
+            BenefitType::HealthInsurance => "health_insurance",
+            BenefitType::DentalVision => "dental_vision",
+            BenefitType::LifeInsurance => "life_insurance",
+            BenefitType::RetirementPlan => "retirement_plan",
+            BenefitType::PaidTimeOff => "paid_time_off",
+            BenefitType::EducationAssistance => "education_assistance",
+            BenefitType::WellnessProgram => "wellness_program",
+            BenefitType::TransportationAllowance => "transportation_allowance",
+            BenefitType::MealAllowance => "meal_allowance",
+            BenefitType::PerformanceBonus => "performance_bonus",
+        }
+    }
+
+    pub fn from_key(key: &str) -> Option<BenefitType> {
+        match key {
+            "health_insurance" => Some(BenefitType::HealthInsurance),
+            "dental_vision" => Some(BenefitType::DentalVision),
+            "life_insurance" => Some(BenefitType::LifeInsurance),
+            "retirement_plan" => Some(BenefitType::RetirementPlan),
+            "paid_time_off" => Some(BenefitType::PaidTimeOff),
+            "education_assistance" => Some(BenefitType::EducationAssistance),
+            "wellness_program" => Some(BenefitType::WellnessProgram),
+            "transportation_allowance" => Some(BenefitType::TransportationAllowance),
+            "meal_allowance" => Some(BenefitType::MealAllowance),
+            "performance_bonus" => Some(BenefitType::PerformanceBonus),
+            _ => None,
+        }
+    }
+
+    pub fn monthly_cost_per_employee(&self) -> f64 {
+        match self {
+            BenefitType::HealthInsurance => 3_500.0,
+            BenefitType::DentalVision => 800.0,
+            BenefitType::LifeInsurance => 500.0,
+            BenefitType::RetirementPlan => 2_000.0,
+            BenefitType::PaidTimeOff => 1_500.0,
+            BenefitType::EducationAssistance => 2_500.0,
+            BenefitType::WellnessProgram => 600.0,
+            BenefitType::TransportationAllowance => 1_200.0,
+            BenefitType::MealAllowance => 1_000.0,
+            BenefitType::PerformanceBonus => 0.0,
+        }
+    }
+
+    pub fn morale_bonus(&self) -> f64 {
+        match self {
+            BenefitType::HealthInsurance => 8.0,
+            BenefitType::DentalVision => 3.0,
+            BenefitType::LifeInsurance => 2.0,
+            BenefitType::RetirementPlan => 5.0,
+            BenefitType::PaidTimeOff => 6.0,
+            BenefitType::EducationAssistance => 4.0,
+            BenefitType::WellnessProgram => 3.0,
+            BenefitType::TransportationAllowance => 2.5,
+            BenefitType::MealAllowance => 2.0,
+            BenefitType::PerformanceBonus => 4.0,
+        }
+    }
+
+    pub fn turnover_reduction(&self) -> f64 {
+        match self {
+            BenefitType::HealthInsurance => 3.0,
+            BenefitType::DentalVision => 1.0,
+            BenefitType::LifeInsurance => 0.5,
+            BenefitType::RetirementPlan => 2.0,
+            BenefitType::PaidTimeOff => 2.5,
+            BenefitType::EducationAssistance => 1.5,
+            BenefitType::WellnessProgram => 1.0,
+            BenefitType::TransportationAllowance => 0.8,
+            BenefitType::MealAllowance => 0.5,
+            BenefitType::PerformanceBonus => 1.5,
+        }
+    }
+
+    pub fn performance_bonus(&self) -> f64 {
+        match self {
+            BenefitType::HealthInsurance => 1.0,
+            BenefitType::DentalVision => 0.5,
+            BenefitType::LifeInsurance => 0.3,
+            BenefitType::RetirementPlan => 0.8,
+            BenefitType::PaidTimeOff => 0.7,
+            BenefitType::EducationAssistance => 1.2,
+            BenefitType::WellnessProgram => 0.6,
+            BenefitType::TransportationAllowance => 0.4,
+            BenefitType::MealAllowance => 0.3,
+            BenefitType::PerformanceBonus => 2.0,
+        }
+    }
+
+    pub fn description(&self) -> &str {
+        match self {
+            BenefitType::HealthInsurance => {
+                "Comprehensive medical coverage for employees and dependents"
+            }
+            BenefitType::DentalVision => "Dental and vision care coverage",
+            BenefitType::LifeInsurance => "Life insurance and accidental death coverage",
+            BenefitType::RetirementPlan => "Company-matched retirement savings plan",
+            BenefitType::PaidTimeOff => "Additional vacation and sick leave days",
+            BenefitType::EducationAssistance => {
+                "Tuition reimbursement and skill development programs"
+            }
+            BenefitType::WellnessProgram => {
+                "Gym membership, mental health support, health screenings"
+            }
+            BenefitType::TransportationAllowance => "Monthly transportation subsidy",
+            BenefitType::MealAllowance => "Daily meal allowance or subsidized cafeteria",
+            BenefitType::PerformanceBonus => "Quarterly performance-based bonus pool",
+        }
+    }
+
+    pub fn icon(&self) -> &str {
+        match self {
+            BenefitType::HealthInsurance => "Heart",
+            BenefitType::DentalVision => "Eye",
+            BenefitType::LifeInsurance => "Shield",
+            BenefitType::RetirementPlan => "PiggyBank",
+            BenefitType::PaidTimeOff => "Calendar",
+            BenefitType::EducationAssistance => "GraduationCap",
+            BenefitType::WellnessProgram => "Activity",
+            BenefitType::TransportationAllowance => "Car",
+            BenefitType::MealAllowance => "Utensils",
+            BenefitType::PerformanceBonus => "Trophy",
+        }
+    }
+
+    pub fn all_types() -> Vec<BenefitType> {
+        vec![
+            BenefitType::HealthInsurance,
+            BenefitType::DentalVision,
+            BenefitType::LifeInsurance,
+            BenefitType::RetirementPlan,
+            BenefitType::PaidTimeOff,
+            BenefitType::EducationAssistance,
+            BenefitType::WellnessProgram,
+            BenefitType::TransportationAllowance,
+            BenefitType::MealAllowance,
+            BenefitType::PerformanceBonus,
+        ]
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EmployeeBenefits {
+    pub active_benefits: Vec<BenefitType>,
+    pub quarters_active: HashMap<String, i32>,
+}
+
+impl Default for EmployeeBenefits {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl EmployeeBenefits {
+    pub fn new() -> Self {
+        EmployeeBenefits {
+            active_benefits: vec![BenefitType::HealthInsurance],
+            quarters_active: vec![("health_insurance".to_string(), 0)]
+                .into_iter()
+                .collect(),
+        }
+    }
+
+    pub fn activate(&mut self, benefit: BenefitType) -> f64 {
+        if self.active_benefits.contains(&benefit) {
+            return 0.0;
+        }
+        self.active_benefits.push(benefit);
+        self.quarters_active.insert(benefit.key().to_string(), 0);
+        benefit.monthly_cost_per_employee() * 3.0
+    }
+
+    pub fn deactivate(&mut self, benefit: BenefitType) -> bool {
+        if let Some(idx) = self.active_benefits.iter().position(|b| *b == benefit) {
+            self.active_benefits.remove(idx);
+            self.quarters_active.remove(benefit.key());
+            return true;
+        }
+        false
+    }
+
+    pub fn is_active(&self, benefit: BenefitType) -> bool {
+        self.active_benefits.contains(&benefit)
+    }
+
+    pub fn total_morale_bonus(&self) -> f64 {
+        self.active_benefits.iter().map(|b| b.morale_bonus()).sum()
+    }
+
+    pub fn total_turnover_reduction(&self) -> f64 {
+        self.active_benefits
+            .iter()
+            .map(|b| b.turnover_reduction())
+            .sum()
+    }
+
+    pub fn total_performance_bonus(&self) -> f64 {
+        self.active_benefits
+            .iter()
+            .map(|b| b.performance_bonus())
+            .sum()
+    }
+
+    pub fn total_monthly_cost_per_employee(&self) -> f64 {
+        self.active_benefits
+            .iter()
+            .map(|b| b.monthly_cost_per_employee())
+            .sum()
+    }
+
+    pub fn process_quarter(&mut self) {
+        for benefit in &self.active_benefits {
+            if let Some(count) = self.quarters_active.get_mut(benefit.key()) {
+                *count += 1;
+            }
+        }
+    }
+}

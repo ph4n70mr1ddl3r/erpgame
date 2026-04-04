@@ -730,3 +730,37 @@ pub struct FranchiseForm {
 pub struct BuybackForm {
     pub franchise_id: String,
 }
+
+#[derive(Debug, Deserialize)]
+pub struct ActivateBenefForm {
+    pub benefit_type: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct DeactivateBenefForm {
+    pub benefit_type: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct BenefitRow {
+    pub key: String,
+    pub name: String,
+    pub description: String,
+    pub cost_per_employee: String,
+    pub morale_bonus: String,
+    pub turnover_reduction: String,
+    pub performance_bonus: String,
+    pub is_active: bool,
+    pub can_activate: bool,
+    pub reason: String,
+    pub show_reason: bool,
+}
+
+#[derive(Debug, Serialize)]
+pub struct BenefitsSummary {
+    pub total_monthly_cost: String,
+    pub active_count: u32,
+    pub total_morale_bonus: String,
+    pub total_turnover_reduction: String,
+    pub total_performance_bonus: String,
+}

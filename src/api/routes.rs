@@ -1824,12 +1824,48 @@ pub async fn employees_page(State(state): State<AppState>) -> Response {
         can_close: false,
     }).collect();
 
+    let benefit_rows: Vec<crate::api::dto::BenefitRow> = super::employees::BenefitType::all_types().iter().map(|b| {
+        let is_active = s.employee_benefits.is_active(b);
+        let can_afford = s.company.cash >= b.monthly_cost_per_employee() * s.employee_system.total_count as f64;
+        let (can_activate, reason, show_reason) = if is_active {
+            (false, "Already active".into(), true)
+        } else if !can_afford {
+            (false, format!("Need {} monthly", format_currency(b.monthly_cost_per_employee() * s.employee_system.total_count as f64)), true)
+        } else {
+            (true, String::new(), false)
+        };
+        crate::api::dto::BenefitRow {
+            key: b.key().to_string(),
+            name: b.label().to_string(),
+            description: b.description().to_string(),
+            cost_per_employee: format_currency_full(b.monthly_cost_per_employee()),
+            morale_bonus: format!("{:+.1}%", b.morale_bonus()),
+            turnover_reduction: format!("-{:.1}%", b.turnover_reduction()),
+            performance_bonus: format!("{:+.1}%", b.performance_bonus()),
+            is_active,
+            can_activate,
+            reason,
+            show_reason,
+        }
+    }).collect();
+
+    let benefits_summary = crate::api::dto::BenefitsSummary {
+        total_monthly_cost: format_currency_full(s.employee_benefits.total_monthly_cost(&s.employee_system)),
+        active_count: s.employee_benefits.active_count(),
+        total_morale_bonus: format!("{:+.1}%", s.employee_benefits.total_morale_bonus()),
+        total_turnover_reduction: format!("-{:.1}%", s.employee_benefits.total_turnover_reduction()),
+        total_performance_bonus: format!("{:+.1}%", s.employee_benefits.total_performance_bonus()),
+    };
+
     crate::templates::EmployeesTemplate {
         employees: employee_rows,
         role_options,
-        training_options,
+        training_options
+ training_options,
         stats,
         stores: store_rows,
+        benefits: benefit_rows,
+        benefits_summary,
         cash: format_currency_full(s.company.cash),
         messages: s.messages_vec(),
         current_quarter: s.current_quarter_label(),
@@ -2208,4 +2244,44 @@ pub async fn buyback_franchise_route(State(state): State<AppState>, Form(form): 
         }
     }
     Redirect::to("/franchise").into_response()
+}
+
+pub async fn activate_benefit_route(State(state): State<AppState>, Form(form): Form<super::dto::ActivateBenefitForm>) -> Response {
+    let mut state = state.lock().await;
+    let benefit_type = match super::employees::BenefitType::from_key(&form.benefit_type) {
+        Some(b) => b,
+        None => {
+            state.push_message("Invalid benefit type.".into());
+            return Redirect::to("/employees").into_response();
+        }
+    };
+
+    match state.employee_benefits.activate(&mut state.company, benefit_type) {
+        Ok(cost) => {
+            state.push_message(format!(
+                "Activated {} for all employees. Monthly cost: {}",
+                benefit_type.label(),
+                format_currency(cost)
+            ));
+        }
+        Err(msg) => {
+            state.push_message(msg.to_string());
+        }
+    }
+    Redirect::to("/employees").into_response()
+}
+
+pub async fn deactivate_benefit_route(State(state): State<AppState>, Form(form): Form<super::dto::DeactivateBenefitForm>) -> Response {
+    let mut state = state.lock().await;
+    let benefit_type = match super::employees::BenefitType::from_key(&form.benefit_type) {
+        Some(b) => b,
+        None => {
+            state.push_message("Invalid benefit type.".into());
+            return Redirect::to("/employees").into_response();
+        }
+    };
+
+    state.employee_benefits.deactivate(benefit_type);
+    state.push_message(format!("Deactivated {} for all employees.", benefit_type.label()));
+    Redirect::to("/employees").into_response()
 }

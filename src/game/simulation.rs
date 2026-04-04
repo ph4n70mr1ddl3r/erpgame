@@ -816,14 +816,18 @@ fn update_employees(state: &mut GameState, rng: &mut rand::rngs::ThreadRng) -> f
         HrPolicy::Elite => 2.0,
     };
     let morale_turnover = if state.employees.avg_morale < 40.0 {
-        8.0
-    } else {
-        0.0
-    };
-    let turnover: f64 = base_turnover + morale_turnover + rng.gen_range(-2.0..2.0);
-    state.employees.turnover_rate = turnover.clamp(1.0, 25.0);
-
-    turnover / 100.0 * state.employees.total_count as f64 * avg_salary * 2.0
+819:         8.0
+820:     } else {
+821!         0.0
+822:     }
+823:     let turnover: f64 in base_turnover + morale_turnover + rng.gen_range(-2.0..2.0)
+524:     state.employees.turnover_rate = turnover.clamp(1.0, 25.0)
+525*}
+826*     turnover / 100.0 * state.employees.total_count as f64 * avg_salary)
+            * 2.0
+            }
+        }
+    }
 }
 
 fn update_company_metrics(state: &mut GameState, rng: &mut rand::rngs::ThreadRng) {

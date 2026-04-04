@@ -49,6 +49,52 @@
 </div>
 
 <div class="card" style="padding: 1rem; margin-bottom: 1.5rem;">
+    <h3 style="font-size: 0.9rem; font-weight: 600; margin-bottom: 0.75rem; color: #94a3b8;">EMPLOYEE BENEFITS</span>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; font-size: 0.85rem; margin-bottom: 1rem;">
+        <div>Active: <span style="color: #22c55e; font-weight: 600;">{{ benefits_summary.active_count }}</</span></div>
+        <div>Monthly Cost: <span style="color: #f59e0b;">{{ benefits_summary.total_monthly_cost }}</span></div>
+        <div>Morale Bonus: <span style="color: #22c55e;">{{ benefits_summary.total_morale_bonus }}</span></div>
+        <div>Turnover Reduction: <span style="color: #22c55e;">{{ benefits_summary.total_turnover_reduction }}</span></div>
+        <div>Performance Bonus: <span style="color: #22c55e;">{{ benefits_summary.total_performance_bonus }}</span></div>
+    </div>
+    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 0.75rem;">
+        {% for benefit in benefits %}
+        <div class="card" style="padding: 1rem; background: {% if benefit.is_active %} rgba(34, 197, 94, 0.1) {% else %} rgba(30, 41, 59, 0.3) {% endif %};">
+            <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 0.5rem;">
+                <div>
+                    <div style="font-weight: 600; color: {% if benefit.is_active %} #22c55e {% else %} #cbd5e1 {% endif %};">{{ benefit.name }}</div>
+                    <div style="font-size: 0.75rem; color: #94a3b8;">{{ benefit.description }}</div>
+                </div>
+                <div style="text-align: right;">
+                    {% if benefit.is_active %}
+                    <form action="/employees/benefits/deactivate" method="POST" style="display: inline;">
+                        <input type="hidden" name="benefit_type" value="{{ benefit.key }}">
+                        <button type="submit" class="btn-danger btn-sm">Deactivate</button>
+                    </form>
+                    {% else %}
+                    <form action="/employees/benefits/activate" method="POST" style="display: inline;" onsubmit="return confirm('Activate {{ benefit.name }} for all employees?\nMonthly cost: {{ benefit.cost_per_employee }}/employee');">
+                        <input type="hidden" name="benefit_type" value="{{ benefit.key }}">
+                        <button type="submit" class="btn-success btn-sm" {% if !benefit.can_activate %} disabled {% endif %}>Activate</button>
+                    </form>
+                    {% if benefit.show_reason %}
+                    <div style="font-size: 0.7rem; color: #ef4444; margin-top: 0.25rem;">{{ benefit.reason }}</div>
+                    {% endif %}
+                    {% endif %}
+                </div>
+            </div>
+            <div style="font-size: 0.8rem; color: #94a3b8; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.5rem; margin-top: 0.5rem;">
+                <div>Cost: <span style="color: #f59e0b;">{{ benefit.cost_per_employee }}</span>/emp</div>
+                <div>Morale: <span style="color: #22c55e;">{{ benefit.morale_bonus }}</span></div>
+                <div>Turnover: <span style="color: #3b82f6;">{{ benefit.turnover_reduction }}</span></div>
+                <div>Performance: <span style="color: #a78bfa;">{{ benefit.performance_bonus }}</span></div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    <p style="font-size: 0.75rem; color: #64748b; margin-top: 0.5rem;">Employee benefits improve morale, reduce turnover, and boost performance. Each active benefit adds to your monthly payroll costs.</p>
+</div>
+
+<div class="card" style="padding: 1rem; margin-bottom: 1.5rem;">
     <h3 style="font-size: 0.9rem; font-weight: 600; margin-bottom: 0.75rem; color: #94a3b8;">TRAIN ALL BY ROLE</h3>
     <form action="/employees/train-role" method="POST" style="display: grid; grid-template-columns: 2fr 2fr 1fr; gap: 0.75rem; align-items: end;">
         <div>

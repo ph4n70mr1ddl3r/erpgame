@@ -58,6 +58,8 @@ pub struct GameState {
     pub research_lab: super::research::ResearchLab,
     #[serde(default)]
     pub csr: super::csr::CsrState,
+    #[serde(default)]
+    pub ad_campaigns: super::ad_campaigns::AdCampaignState,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -980,6 +982,7 @@ impl GameState {
             seasonal_promotions: vec![],
             research_lab: super::research::ResearchLab::new(),
             csr: super::csr::CsrState::new(),
+            ad_campaigns: super::ad_campaigns::AdCampaignState::new(),
         }
     }
 

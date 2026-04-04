@@ -30,6 +30,7 @@ use crate::game::{
         upgrade_logistics, upgrade_warehouse, upgrade_delivery_service,
     },
     employees::{EmployeeRole, TrainingType},
+    ad_campaigns::{AdBudget, TargetAudience, launch_ad_campaign, cancel_ad_campaign, average_ad_roi, total_ad_revenue, total_ad_spend},
 };
 use super::dto::*;
 
@@ -1949,4 +1950,162 @@ pub async fn train_role_route(State(state): State<AppState>, Form(form): Form<su
     state.company.cash -= total_cost;
     state.push_message(format!("Trained {} {} employees. Total cost: {}", count, role.label(), format_currency(total_cost)));
     Redirect::to("/employees").into_response()
+}
+
+pub async fn ad_campaigns_page(State(state): State<AppState>) -> Response {
+    let state = state.lock().await;
+    let s = &*state;
+
+    let campaign_rows: Vec<crate::api::dto::AdCampaignRow> = s.ad_campaigns.campaigns.iter().map(|c| {
+        let roi = c.roi();
+        let roi_class = if roi >= 50.0 { "text-green-400".to_string() }
+            else if roi >= 0.0 { "text-yellow-400".to_string() }
+            else { "text-red-400".to_string() };
+
+        crate::api::dto::AdCampaignRow {
+            id: c.id.clone(),
+            name: c.name.clone(),
+            budget: c.budget.label().to_string(),
+            budget_key: c.budget.key().to_string(),
+            target_audience: c.target_audience.label().to_string(),
+            audience_key: c.target_audience.key().to_string(),
+            quarters_active: c.quarters_active,
+            total_spent: format_currency(c.total_spent),
+            total_revenue: format_currency(c.total_revenue_generated),
+            roi: format!("{:.1}%", roi),
+            roi_class,
+            impressions: if c.impressions >= 1_000_000 {
+                format!("{:.1}M", c.impressions as f64 / 1_000_000.0)
+            } else if c.impressions >= 1_000 {
+                format!("{:.1}K", c.impressions as f64 / 1_000.0)
+            } else {
+                c.impressions.to_string()
+            },
+            clicks: if c.clicks >= 1_000_000 {
+                format!("{:.1}M", c.clicks as f64 / 1_000_000.0)
+            } else if c.clicks >= 1_000 {
+                format!("{:.1}K", c.clicks as f64 / 1_000.0)
+            } else {
+                c.clicks.to_string()
+            },
+            conversions: if c.conversions >= 1_000 {
+                format!("{:.1}K", c.conversions as f64 / 1_000.0)
+            } else {
+                c.conversions.to_string()
+            },
+            ctr: format!("{:.2}%", c.ctr()),
+            conversion_rate: format!("{:.1}%", c.conversion_rate()),
+        }
+    }).collect();
+
+    let existing_combos: std::collections::HashSet<(String, String)> = s.ad_campaigns.campaigns.iter()
+        .map(|c| (c.budget.key().to_string(), c.target_audience.key().to_string()))
+        .collect();
+
+    let can_launch_more = s.ad_campaigns.campaigns.len() < 10;
+
+    let mut options: Vec<crate::api::dto::AdCampaignOption> = Vec::new();
+    for budget in AdBudget::all_budgets() {
+        for audience in TargetAudience::all_audiences() {
+            let combo_key = (budget.key().to_string(), audience.key().to_string());
+            let already_exists = existing_combos.contains(&combo_key);
+            let can_afford = s.company.cash >= budget.quarterly_cost();
+
+            let (can_launch, reason, show_reason) = if already_exists {
+                (false, "Already running".into(), true)
+            } else if !can_launch_more {
+                (false, "Max 10 campaigns".into(), true)
+            } else if !can_afford {
+                (false, format!("Need {}", format_currency(budget.quarterly_cost())), true)
+            } else {
+                (true, String::new(), false)
+            };
+
+            options.push(crate::api::dto::AdCampaignOption {
+                budget_key: budget.key().to_string(),
+                budget_name: budget.label().to_string(),
+                audience_key: audience.key().to_string(),
+                audience_name: audience.label().to_string(),
+                audience_description: audience.description().to_string(),
+                quarterly_cost: format_currency(budget.quarterly_cost()),
+                base_roi: format!("{:.0}x", budget.base_roi()),
+                base_conversion: format!("{:.1}%", audience.base_conversion()),
+                avg_purchase: format_currency(audience.avg_purchase_value()),
+                can_launch,
+                reason,
+                show_reason,
+            });
+        }
+    }
+
+    let cmo_skill = s.executives.iter().find(|e| e.position == ExecutivePosition::CMO)
+        .map(|e| format!("{:.0}/100", e.skill))
+        .unwrap_or_else(|| "Not hired".into());
+
+    let avg_roi = average_ad_roi(s);
+    let total_rev = total_ad_revenue(s);
+    let total_spent = total_ad_spend(s);
+
+    crate::templates::AdCampaignsTemplate {
+        campaigns: campaign_rows,
+        options,
+        active_count: s.ad_campaigns.campaigns.len(),
+        avg_roi: format!("{:.1}%", avg_roi),
+        total_revenue: format_currency(total_rev),
+        total_spent: format_currency(total_spent),
+        cmo_skill,
+        cash: format_currency_full(s.company.cash),
+        messages: s.messages_vec(),
+        current_quarter: s.current_quarter_label(),
+        active_page: "ad_campaigns".to_string(),
+    }.into_response()
+}
+
+pub async fn launch_ad_campaign_route(State(state): State<AppState>, Form(form): Form<super::dto::AdCampaignForm>) -> Response {
+    let mut state = state.lock().await;
+    let budget = match AdBudget::from_key(&form.budget) {
+        Some(b) => b,
+        None => {
+            state.push_message("Invalid budget level.".into());
+            return Redirect::to("/ad-campaigns").into_response();
+        }
+    };
+    let audience = match TargetAudience::from_key(&form.target_audience) {
+        Some(a) => a,
+        None => {
+            state.push_message("Invalid target audience.".into());
+            return Redirect::to("/ad-campaigns").into_response();
+        }
+    };
+    match launch_ad_campaign(&mut state, budget, audience) {
+        Ok(cost) => {
+            state.push_message(format!(
+                "Launched targeted ad campaign: {} targeting {}. Cost: {}",
+                budget.label(),
+                audience.label(),
+                format_currency(cost)
+            ));
+        }
+        Err(msg) => {
+            state.push_message(msg.to_string());
+        }
+    }
+    Redirect::to("/ad-campaigns").into_response()
+}
+
+pub async fn cancel_ad_campaign_route(State(state): State<AppState>, Form(form): Form<super::dto::CancelAdCampaignForm>) -> Response {
+    let mut state = state.lock().await;
+    match cancel_ad_campaign(&mut state, &form.campaign_id) {
+        Some(campaign) => {
+            state.push_message(format!(
+                "Cancelled ad campaign: {} (ROI: {:.1}%)",
+                campaign.name,
+                campaign.roi()
+            ));
+        }
+        None => {
+            state.push_message("Campaign not found.".into());
+        }
+    }
+    Redirect::to("/ad-campaigns").into_response()
 }

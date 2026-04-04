@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1 style="font-size: 1.5rem; font-weight: 700; margin-bottom: 0.25rem;">Targeted Ad Campaigns</h1>
+<p style="color: #64748b; margin-bottom: 1rem;">Launch targeted digital ad campaigns with custom budgets and audience segments. Track performance metrics and ROI in real-time. Your CMO's skill amplifies campaign effectiveness.</p>
+
+{% if messages.len() > 0 %}
+<div style="margin-bottom: 1rem;">
+    {% for msg in messages %}
+    <div class="message msg-info">{{ msg }}</div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+    <div class="stat-card">
+        <div style="font-size: 0.75rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em;">Active Campaigns</div>
+        <div style="font-size: 1.5rem; font-weight: 700; margin-top: 0.25rem;">{{ active_count }} / 10</div>
+    </div>
+    <div class="stat-card">
+        <div style="font-size: 0.75rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em;">Average ROI</div>
+        <div style="font-size: 1.5rem; font-weight: 700; margin-top: 0.25rem; color: #22c55e;">{{ avg_roi }}</div>
+    </div>
+    <div class="stat-card">
+        <div style="font-size: 0.75rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em;">Total Revenue</div>
+        <div style="font-size: 1.5rem; font-weight: 700; margin-top: 0.25rem; color: #3b82f6;">{{ total_revenue }}</div>
+    </div>
+    <div class="stat-card">
+        <div style="font-size: 0.75rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em;">Total Spent</div>
+        <div style="font-size: 1.5rem; font-weight: 700; margin-top: 0.25rem; color: #f59e0b;">{{ total_spent }}</div>
+    </div>
+    <div class="stat-card">
+        <div style="font-size: 0.75rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em;">CMO Skill</div>
+        <div style="font-size: 1.5rem; font-weight: 700; margin-top: 0.25rem;">{{ cmo_skill }}</div>
+        <div style="font-size: 0.7rem; color: #64748b; margin-top: 0.15rem;">Amplifies ad performance</div>
+    </div>
+</div>
+
+{% if campaigns.len() > 0 %}
+<h2 style="font-size: 1.1rem; font-weight: 600; margin-bottom: 0.75rem;">Active Campaigns</h2>
+<div style="overflow-x: auto; margin-bottom: 1.5rem;">
+    <table>
+        <thead>
+            <tr>
+                <th>Campaign</th>
+                <th>Budget</th>
+                <th>Target</th>
+                <th>Duration</th>
+                <th>Impressions</th>
+                <th>Clicks</th>
+                <th>CTR</th>
+                <th>Conversions</th>
+                <th>Conv. Rate</th>
+                <th>Revenue</th>
+                <th>Spent</th>
+                <th>ROI</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for campaign in campaigns %}
+            <tr>
+                <td style="font-weight: 600; color: #3b82f6;">{{ campaign.name }}</td>
+                <td>{{ campaign.budget }}</td>
+                <td>{{ campaign.target_audience }}</td>
+                <td>{{ campaign.quarters_active }} Q</td>
+                <td>{{ campaign.impressions }}</td>
+                <td>{{ campaign.clicks }}</td>
+                <td style="color: #22c55e;">{{ campaign.ctr }}</td>
+                <td>{{ campaign.conversions }}</td>
+                <td style="color: #a78bfa;">{{ campaign.conversion_rate }}</td>
+                <td style="color: #3b82f6;">{{ campaign.total_revenue }}</td>
+                <td style="color: #f59e0b;">{{ campaign.total_spent }}</td>
+                <td class="{{ campaign.roi_class }}" style="font-weight: 600;">{{ campaign.roi }}</td>
+                <td>
+                    <form action="/ad-campaigns/cancel" method="POST" style="display: inline;">
+                        <input type="hidden" name="campaign_id" value="{{ campaign.id }}">
+                        <button type="submit" class="btn-danger btn-sm" onclick="return confirm('Cancel this campaign?')">Cancel</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+
+<h2 style="font-size: 1.1rem; font-weight: 600; margin-bottom: 0.75rem;">Launch New Campaign</h2>
+
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 1rem;">
+    {% for opt in options %}
+    <div class="card" style="padding: 1rem; {% if opt.can_launch %}border-left: 4px solid #3b82f6;{% else %}opacity: 0.7;{% endif %}">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+            <h3 style="font-size: 0.95rem; font-weight: 600; color: #3b82f6;">{{ opt.budget_name }}</h3>
+            <span style="font-size: 0.7rem; color: #94a3b8;">{{ opt.audience_name }}</span>
+        </div>
+        <p style="font-size: 0.75rem; color: #64748b; margin-bottom: 0.75rem;">{{ opt.audience_description }}</p>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.25rem; font-size: 0.8rem; margin-bottom: 0.75rem;">
+            <div><span style="color: #64748b;">Cost/Q:</span> <span style="color: #e2e8f0;">{{ opt.quarterly_cost }}</span></div>
+            <div><span style="color: #64748b;">Base ROI:</span> <span style="color: #22c55e;">{{ opt.base_roi }}</span></div>
+            <div><span style="color: #64748b;">Conv. Rate:</span> <span style="color: #a78bfa;">{{ opt.base_conversion }}</span></div>
+            <div><span style="color: #64748b;">Avg. Purchase:</span> <span style="color: #3b82f6;">{{ opt.avg_purchase }}</span></div>
+        </div>
+        {% if opt.can_launch %}
+        <form action="/ad-campaigns/launch" method="POST" style="margin-top: 0.5rem;">
+            <input type="hidden" name="budget" value="{{ opt.budget_key }}">
+            <input type="hidden" name="target_audience" value="{{ opt.audience_key }}">
+            <button type="submit" class="btn-primary btn-sm" style="width: 100%;">Launch Campaign</button>
+        </form>
+        {% else if opt.show_reason %}
+        <div style="font-size: 0.75rem; color: #ef4444; text-align: center; margin-top: 0.5rem;">{{ opt.reason }}</div>
+        {% endif %}
+    </div>
+    {% endfor %}
+</div>
+
+<div style="margin-top: 1.5rem; text-align: center; font-size: 0.8rem; color: #64748b;">
+    Cash on hand: <span style="color: #e2e8f0;">{{ cash }}</span>
+</div>
+
+{% endblock %}

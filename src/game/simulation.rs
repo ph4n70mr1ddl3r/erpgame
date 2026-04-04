@@ -1,6 +1,7 @@
 use rand::Rng;
 
 use super::achievements::check_achievements;
+use super::ad_campaigns::process_ad_campaigns;
 use super::board::update_board;
 use super::campaigns::{campaign_revenue_multiplier, process_campaigns};
 use super::competitors::{
@@ -82,11 +83,13 @@ pub fn simulate_quarter(state: &mut GameState) {
     let private_label_net = process_private_labels(state, &mut rng);
     let online_revenue = state.ecommerce.quarterly_online_revenue;
     let pl_revenue = super::private_label::private_label_revenue(state);
-    let total_revenue = total_revenue + online_revenue + pl_revenue;
+    let ad_revenue = super::ad_campaigns::total_ad_revenue(state);
+    let total_revenue = total_revenue + online_revenue + pl_revenue + ad_revenue;
     let total_expenses = calculate_expenses(state, operating_count, cto_skill);
     let loyalty_cost = update_loyalty(state);
     process_campaigns(state);
     process_seasonal_promotions(state);
+    let ad_campaign_cost = process_ad_campaigns(state, &mut rng);
     let csr_cost = process_csr(state);
     let loan_payments = process_loans(state);
     let event_impacts = process_random_events(state, &mut rng, total_revenue);
@@ -102,6 +105,7 @@ pub fn simulate_quarter(state: &mut GameState) {
         + loyalty_cost
         + ecommerce_cost
         + supply_chain_cost
+        + ad_campaign_cost
         + csr_cost
         + if private_label_net < 0.0 {
             -private_label_net

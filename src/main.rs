@@ -69,6 +69,9 @@ async fn main() {
         .route("/employees/{id}/fire", post(api::routes::fire_employee_route))
         .route("/employees/train", post(api::routes::train_employee_route))
         .route("/employees/train-role", post(api::routes::train_role_route))
+        .route("/ad-campaigns", get(api::routes::ad_campaigns_page))
+        .route("/ad-campaigns/launch", post(api::routes::launch_ad_campaign_route))
+        .route("/ad-campaigns/cancel", post(api::routes::cancel_ad_campaign_route))
         .with_state(game_state)
         .nest_service("/static", ServeDir::new("static"));
 

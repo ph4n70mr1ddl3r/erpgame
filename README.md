@@ -18,6 +18,7 @@ A web-based business simulation game where you take on the role of CEO of Bahay 
 - **Loyalty Program**: Launch and manage a customer loyalty rewards program with multiple tiers (Basic, Silver, Gold, Platinum) to boost revenue, satisfaction, and repeat business.
 - **Achievements**: Unlock achievements for various milestones (store count, revenue, company value, etc.).
 - **E-commerce**: Launch and upgrade your online channel from a basic website to full omnichannel integration. Your CTO's skill amplifies online revenue.
+- **Sponsorships**: Sponsor sports teams, community events, trade shows, and more to boost brand visibility and reputation, and revenue. Your CMO's skill amplifies sponsorship effects.
 - **Charts & History**: View financial history and performance charts over time.
 
 ## Tech Stack

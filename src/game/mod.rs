@@ -1,4 +1,5 @@
 pub mod achievements;
+pub mod ad_campaigns;
 pub mod board;
 pub mod campaigns;
 pub mod competitors;

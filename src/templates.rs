@@ -344,3 +344,19 @@ pub struct EmployeesTemplate {
     pub current_quarter: String,
     pub active_page: String,
 }
+
+#[derive(Template)]
+#[template(path = "ad_campaigns.html")]
+pub struct AdCampaignsTemplate {
+    pub campaigns: Vec<crate::api::dto::AdCampaignRow>,
+    pub options: Vec<crate::api::dto::AdCampaignOption>,
+    pub active_count: usize,
+    pub avg_roi: String,
+    pub total_revenue: String,
+    pub total_spent: String,
+    pub cmo_skill: String,
+    pub cash: String,
+    pub messages: Vec<String>,
+    pub current_quarter: String,
+    pub active_page: String,
+}

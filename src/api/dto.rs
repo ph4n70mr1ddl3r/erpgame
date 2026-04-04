@@ -644,3 +644,50 @@ pub struct EmployeeStats {
     pub avg_skill: String,
     pub turnover_rate: String,
 }
+
+#[derive(Debug, Deserialize)]
+pub struct AdCampaignForm {
+    pub budget: String,
+    pub target_audience: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct CancelAdCampaignForm {
+    pub campaign_id: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct AdCampaignRow {
+    pub id: String,
+    pub name: String,
+    pub budget: String,
+    pub budget_key: String,
+    pub target_audience: String,
+    pub audience_key: String,
+    pub quarters_active: i32,
+    pub total_spent: String,
+    pub total_revenue: String,
+    pub roi: String,
+    pub roi_class: String,
+    pub impressions: String,
+    pub clicks: String,
+    pub conversions: String,
+    pub ctr: String,
+    pub conversion_rate: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct AdCampaignOption {
+    pub budget_key: String,
+    pub budget_name: String,
+    pub audience_key: String,
+    pub audience_name: String,
+    pub audience_description: String,
+    pub quarterly_cost: String,
+    pub base_roi: String,
+    pub base_conversion: String,
+    pub avg_purchase: String,
+    pub can_launch: bool,
+    pub reason: String,
+    pub show_reason: bool,
+}

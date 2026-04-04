@@ -6,6 +6,7 @@ use super::campaigns::{campaign_revenue_multiplier, process_campaigns};
 use super::competitors::{
     average_competitor_strength, update_competitors_with_actions, PlayerActions,
 };
+use super::csr::{csr_tax_deduction, process_csr};
 use super::ecommerce::process_ecommerce;
 use super::events::{generate_auto_events, generate_pending_events};
 use super::loyalty::{loyalty_revenue_multiplier, update_loyalty};
@@ -86,6 +87,7 @@ pub fn simulate_quarter(state: &mut GameState) {
     let loyalty_cost = update_loyalty(state);
     process_campaigns(state);
     process_seasonal_promotions(state);
+    let csr_cost = process_csr(state);
     let loan_payments = process_loans(state);
     let event_impacts = process_random_events(state, &mut rng, total_revenue);
 
@@ -100,6 +102,7 @@ pub fn simulate_quarter(state: &mut GameState) {
         + loyalty_cost
         + ecommerce_cost
         + supply_chain_cost
+        + csr_cost
         + if private_label_net < 0.0 {
             -private_label_net
         } else {
@@ -118,8 +121,10 @@ pub fn simulate_quarter(state: &mut GameState) {
 
     let gross_profit = total_revenue - all_expenses;
     let net_profit = gross_profit - loan_payments + event_impacts.cash_impact;
+    let csr_deduction = csr_tax_deduction(state);
+    let effective_tax_rate = (state.economy.corporate_tax_rate / 100.0 - csr_deduction).max(0.0);
     let tax = if net_profit > 0.0 {
-        net_profit * state.economy.corporate_tax_rate / 100.0
+        net_profit * effective_tax_rate
     } else {
         0.0
     };

@@ -1051,7 +1051,7 @@ pub async fn supply_chain_page(State(state): State<AppState>) -> Response {
     let active_count = sc.suppliers.iter().filter(|s| s.is_active).count();
     let available_cats = available_supplier_categories(s);
     let category_options: Vec<SupplierCategoryOption> = SupplierCategory::all_categories().iter().map(|c| {
-        let available = available_cats.iter().any(|ac| *ac == *c);
+        let available = available_cats.contains(c);
         let can = available && active_count < 8 && s.company.cash >= 500_000.0;
         SupplierCategoryOption {
             key: c.key().to_string(),

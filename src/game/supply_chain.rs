@@ -488,7 +488,7 @@ pub fn negotiate_supplier(
     category: SupplierCategory,
 ) -> Result<f64, &'static str> {
     let available = available_supplier_categories(state);
-    if !available.iter().any(|c| *c == category) {
+    if !available.contains(&category) {
         return Err("Category already has an active supplier contract.");
     }
 

@@ -1741,3 +1741,168 @@ pub async fn discontinue_csr_route(State(state): State<AppState>, Path(id): Path
     }
     Redirect::to("/csr").into_response()
 }
+
+pub async fn employees_page(State(state): State<AppState>) -> Response {
+    let s = state.lock().await;
+    let s = &*s;
+
+    let mut employee_rows: Vec<EmployeeRow> = Vec::new();
+    for emp in &s.employee_system.employees {
+        let store_name = if let Some(ref store_id) = emp.store_id {
+            s.stores.iter()
+                .find(|st| &st.id == store_id)
+                .map(|st| format!("{} - {}", st.name, st.city))
+                .unwrap_or_else(|| "Unknown Store".to_string())
+        } else {
+            "Corporate HQ".to_string()
+        };
+
+        let morale_class = if emp.morale >= 70.0 { "text-green-400" } else if emp.morale >= 50.0 { "text-yellow-400" } else { "text-red-400" };
+        let performance_class = if emp.performance_rating >= 70.0 { "text-green-400" } else if emp.performance_rating >= 50.0 { "text-yellow-400" } else { "text-red-400" };
+        let tenure = if emp.tenure_quarters < 4 { format!("{} Q", emp.tenure_quarters) } else { format!("{} Y", emp.tenure_quarters / 4) };
+
+        employee_rows.push(EmployeeRow {
+            id: emp.id.clone(),
+            name: emp.name.clone(),
+            role_key: emp.role.key().to_string(),
+            role_name: emp.role.label().to_string(),
+            category: emp.role.category().label().to_string(),
+            store_name,
+            salary_monthly: format_currency_full(emp.salary_monthly),
+            skill: format!("{:.0}/100", emp.skill),
+            morale: format!("{:.0}%", emp.morale),
+            morale_class: morale_class.to_string(),
+            performance: format!("{:.0}/100", emp.performance_rating),
+            performance_class: performance_class.to_string(),
+            tenure,
+            training_count: emp.training_count,
+        });
+    }
+
+    let mut role_options: Vec<RoleOption> = Vec::new();
+    for role in super::employees::EmployeeRole::all_roles() {
+        role_options.push(RoleOption {
+            key: role.key().to_string(),
+            name: role.label().to_string(),
+            category: role.category().label().to_string(),
+            base_salary: format_currency_full(role.base_salary()),
+        });
+    }
+
+    let stats = EmployeeStats {
+        total_count: s.employee_system.total_count,
+        monthly_payroll: format_currency_full(s.employee_system.monthly_payroll),
+        avg_morale: format!("{:.1}%", s.employee_system.avg_morale),
+        avg_skill: format!("{:.1}%", s.employee_system.avg_skill),
+        turnover_rate: format!("{:.1}%", s.employee_system.turnover_rate),
+    };
+
+    let store_rows: Vec<StoreRow> = s.stores.iter().filter(|st| st.status == StoreStatus::Operating).map(|st| StoreRow {
+        id: st.id.clone(),
+        name: st.name.clone(),
+        city: st.city.clone(),
+        region: format!("{:?}", st.region),
+        store_type: st.store_type.label().to_string(),
+        size_sqm: st.size_sqm,
+        status: st.status.label().to_string(),
+        status_class: st.status.css_class().to_string(),
+        quarterly_revenue: format_currency(st.quarterly_revenue),
+        quarterly_expenses: format_currency(st.quarterly_expenses),
+        quarterly_profit: format_currency(st.quarterly_revenue - st.quarterly_expenses),
+        employees: st.employee_count,
+        satisfaction: pct(st.satisfaction),
+        age: if st.age_quarters < 4 { format!("{} Q", st.age_quarters) } else { format!("{} Y", st.age_quarters / 4) },
+        can_close: false,
+    }).collect();
+
+    crate::templates::EmployeesTemplate {
+        employees: employee_rows,
+        role_options,
+        stats,
+        stores: store_rows,
+        cash: format_currency_full(s.company.cash),
+        messages: s.messages_vec(),
+        current_quarter: s.current_quarter_label(),
+        active_page: "employees".to_string(),
+    }.into_response()
+}
+
+pub async fn hire_employee_route(State(state): State<AppState>, Form(form): Form<super::dto::HireEmployeeForm>) -> Response {
+    let mut state = state.lock().await;
+    let role = match super::employees::EmployeeRole::from_key(&form.role) {
+        Some(r) => r,
+        None => {
+            state.push_message("Invalid employee role.".into());
+            return Redirect::to("/employees").into_response();
+        }
+    };
+
+    let store_id = form.store_id.as_ref().and(|s| s.as_str());
+    let hr_multiplier = match state.policies.hr {
+        HrPolicy::Minimal => 1.0,
+        HrPolicy::Standard => 1.1,
+        HrPolicy::Generous => 1.2,
+        HrPolicy::Elite => 1.3,
+    };
+
+    let mut rng = rand::thread_rng();
+    let hiring_cost = state.employee_system.hire(&mut rng, role, store_id.map(|s| s.to_string()), hr_multiplier);
+
+    if state.company.cash < hiring_cost {
+        state.push_message(format!("Cannot afford hiring cost of {}", format_currency(hiring_cost)));
+        return Redirect::to("/employees").into_response();
+    }
+
+    state.company.cash -= hiring_cost;
+    state.push_message(format!(
+        "Hired new {} (Cost: {})",
+        role.label(),
+        format_currency(hiring_cost)
+    ));
+
+    Redirect::to("/employees").into_response()
+}
+
+pub async fn fire_employee_route(State(state): State<AppState>, Path(id): Path<String>) -> Response {
+    let mut state = state.lock().await;
+    match state.employee_system.fire(&id) {
+        Some((name, severance)) => {
+            if state.company.cash < severance {
+                state.push_message(format!("Cannot afford severance of {}", format_currency(severance)));
+                return Redirect::to("/employees").into_response();
+            }
+            state.company.cash -= severance;
+            state.push_message(format!("Fired {}. Severance: {}", name, format_currency(severance)));
+        }
+        None => {
+            state.push_message("Employee not found.".into());
+        }
+    }
+    Redirect::to("/employees").into_response()
+}
+
+pub async fn train_employee_route(State(state): State<AppState>, Form(form): Form<super::dto::TrainEmployeeForm>) -> Response {
+    let mut state = state.lock().await;
+    let training_type = match super::employees::TrainingType::from_key(&form.training_type) {
+        Some(t) => t,
+        None => {
+            state.push_message("Invalid training type.".into());
+            return Redirect::to("/employees").into_response();
+        }
+    };
+
+    match state.employee_system.train_employee(&form.employee_id, training_type) {
+        Some(cost) => {
+            if state.company.cash < cost {
+                state.push_message(format!("Cannot afford training cost of {}", format_currency(cost)));
+                return Redirect::to("/employees").into_response();
+            }
+            state.company.cash -= cost;
+            state.push_message(format!("Training completed. Cost: {}", format_currency(cost)));
+        }
+        None => {
+            state.push_message("Employee not found.".into());
+        }
+    }
+    Redirect::to("/employees").into_response()
+}

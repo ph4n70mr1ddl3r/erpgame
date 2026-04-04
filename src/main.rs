@@ -64,6 +64,10 @@ async fn main() {
         .route("/csr", get(api::routes::csr_page))
         .route("/csr/launch", post(api::routes::launch_csr_route))
         .route("/csr/{id}/discontinue", post(api::routes::discontinue_csr_route))
+        .route("/employees", get(api::routes::employees_page))
+        .route("/employees/hire", post(api::routes::hire_employee_route))
+        .route("/employees/{id}/fire", post(api::routes::fire_employee_route))
+        .route("/employees/train", post(api::routes::train_employee_route))
         .with_state(game_state)
         .nest_service("/static", ServeDir::new("static"));
 

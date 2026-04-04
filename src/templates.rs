@@ -330,3 +330,16 @@ pub struct CsrTemplate {
     pub current_quarter: String,
     pub active_page: String,
 }
+
+#[derive(Template)]
+#[template(path = "employees.html")]
+pub struct EmployeesTemplate {
+    pub employees: Vec<crate::api::dto::EmployeeRow>,
+    pub role_options: Vec<crate::api::dto::RoleOption>,
+    pub stats: crate::api::dto::EmployeeStats,
+    pub stores: Vec<crate::api::dto::StoreRow>,
+    pub cash: String,
+    pub messages: Vec<String>,
+    pub current_quarter: String,
+    pub active_page: String,
+}

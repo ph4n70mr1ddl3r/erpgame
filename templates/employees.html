@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1 style="font-size: 1.5rem; font-weight: 700; margin-bottom: 0.25rem;">Employee Management</h1>
+<p style="color: #64748b; margin-bottom: 1rem;">Cash: <span style="color: #22c55e;">{{ cash }}</span></p>
+
+{% if messages.len() > 0 %}
+<div style="margin-bottom: 1rem;">
+    {% for msg in messages %}
+    <div class="message msg-info">{{ msg }}</div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<div class="card" style="padding: 1rem; margin-bottom: 1.5rem;">
+    <h3 style="font-size: 0.9rem; font-weight: 600; margin-bottom: 0.75rem; color: #94a3b8;">EMPLOYEE STATISTICS</h3>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem; font-size: 0.9rem;">
+        <div>Total: <span style="color: #22c55e; font-weight: 600;">{{ stats.total_count }}</span></div>
+        <div>Payroll: <span style="color: #f59e0b;">{{ stats.monthly_payroll }}/mo</span></div>
+        <div>Avg Morale: <span style="color: #3b82f6;">{{ stats.avg_morale }}</span></div>
+        <div>Avg Skill: <span style="color: #a78bfa;">{{ stats.avg_skill }}</span></div>
+        <div>Turnover: <span style="color: #ef4444;">{{ stats.turnover_rate }}</span></div>
+    </div>
+</div>
+
+<div class="card" style="padding: 1rem; margin-bottom: 1.5rem;">
+    <h3 style="font-size: 0.9rem; font-weight: 600; margin-bottom: 0.75rem; color: #94a3b8;">HIRE NEW EMPLOYEE</h3>
+    <form action="/employees/hire" method="POST" style="display: grid; grid-template-columns: 2fr 2fr 1fr; gap: 0.75rem; align-items: end;">
+        <div>
+            <label style="font-size: 0.8rem; color: #94a3b8; display: block; margin-bottom: 0.25rem;">Role</label>
+            <select name="role" required>
+                <option value="">Select Role...</option>
+                {% for role in role_options %}
+                <option value="{{ role.key }}">{{ role.name }} ({{ role.category }}) - {{ role.base_salary }}/mo</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label style="font-size: 0.8rem; color: #94a3b8; display: block; margin-bottom: 0.25rem;">Assign to Store (Optional)</label>
+            <select name="store_id">
+                <option value="">Corporate HQ</option>
+                {% for store in stores %}
+                <option value="{{ store.id }}">{{ store.name }} ({{ store.city }})</option>
+                {% endfor %}
+            </select>
+        </div>
+        <button type="submit" class="btn-success">Hire</button>
+    </form>
+</div>
+
+{% if employees.len() > 0 %}
+<div class="card" style="padding: 1rem;">
+    <h3 style="font-size: 0.9rem; font-weight: 600; margin-bottom: 0.75rem; color: #94a3b8;">EMPLOYEES ({{ employees.len() }})</h3>
+    <table>
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Role</th>
+                <th>Location</th>
+                <th>Salary</th>
+                <th>Skill</th>
+                <th>Morale</th>
+                <th>Performance</th>
+                <th>Tenure</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for e in employees %}
+            <tr>
+                <td style="font-weight: 600;">{{ e.name }}</td>
+                <td>
+                    <div style="color: #f59e0b;">{{ e.role_name }}</div>
+                    <div style="color: #64748b; font-size: 0.8rem;">{{ e.category }}</div>
+                </td>
+                <td style="font-size: 0.85rem;">{{ e.store_name }}</td>
+                <td style="color: #22c55e;">{{ e.salary_monthly }}</td>
+                <td style="color: #a78bfa;">{{ e.skill }}</td>
+                <td class="{{ e.morale_class }}">{{ e.morale }}</td>
+                <td class="{{ e.performance_class }}">{{ e.performance }}</td>
+                <td style="color: #64748b; font-size: 0.85rem;">{{ e.tenure }}</td>
+                <td>
+                    <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                        <form action="/employees/{{ e.id }}/fire" method="POST" style="display: inline;" onsubmit="return confirm('Fire {{ e.name }}? This will cost severance.');">
+                            <button type="submit" class="btn-danger btn-sm">Fire</button>
+                        </form>
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="card" style="padding: 2rem; text-align: center;">
+    <p style="color: #64748b;">No employees in the new system yet. Your employee data is being tracked.</p>
+</div>
+{% endif %}
+
+{% endblock %}

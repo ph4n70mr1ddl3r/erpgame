@@ -571,3 +571,76 @@ pub struct CsrOptionRow {
     pub reason: String,
     pub show_reason: bool,
 }
+
+#[derive(Debug, Deserialize)]
+pub struct HireEmployeeForm {
+    pub role: String,
+    pub store_id: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct FireEmployeeForm {
+    pub employee_id: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct TrainEmployeeForm {
+    pub employee_id: String,
+    pub training_type: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct RaiseEmployeeForm {
+    pub employee_id: String,
+    pub raise_percentage: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct TrainRoleForm {
+    pub role: String,
+    pub training_type: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct EmployeeRow {
+    pub id: String,
+    pub name: String,
+    pub role_key: String,
+    pub role_name: String,
+    pub category: String,
+    pub store_name: String,
+    pub salary_monthly: String,
+    pub skill: String,
+    pub morale: String,
+    pub morale_class: String,
+    pub performance: String,
+    pub performance_class: String,
+    pub tenure: String,
+    pub training_count: u32,
+}
+
+#[derive(Debug, Serialize)]
+pub struct RoleOption {
+    pub key: String,
+    pub name: String,
+    pub category: String,
+    pub base_salary: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct TrainingOptionRow {
+    pub key: String,
+    pub name: String,
+    pub cost_per_employee: String,
+    pub skill_bonus: String,
+    pub morale_bonus: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct EmployeeStats {
+    pub total_count: u32,
+    pub monthly_payroll: String,
+    pub avg_morale: String,
+    pub avg_skill: String,
+    pub turnover_rate: String,
+}

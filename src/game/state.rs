@@ -6,6 +6,7 @@ use std::sync::LazyLock;
 use super::achievements::default_achievements;
 use super::board::BoardState;
 use super::competitors::default_competitors;
+use super::employees::EmployeeSystem;
 use super::products::default_product_categories;
 
 // Game constants
@@ -21,6 +22,8 @@ pub struct GameState {
     pub company: Company,
     pub stores: Vec<Store>,
     pub executives: Vec<Executive>,
+    #[serde(default)]
+    pub employee_system: EmployeeSystem,
     pub employees: EmployeePool,
     pub policies: Policies,
     pub economy: EconomyState,
@@ -912,6 +915,7 @@ impl GameState {
             },
             stores: vec![store],
             executives: vec![],
+            employee_system: EmployeeSystem::new(),
             employees: EmployeePool {
                 total_count: 70,
                 monthly_payroll: 1_200_000.0,

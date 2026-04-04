@@ -236,7 +236,6 @@ pub fn process_private_labels(state: &mut GameState, rng: &mut rand::rngs::Threa
         state.push_message(msg);
     }
 
-    
     total_revenue - total_cost
 }
 

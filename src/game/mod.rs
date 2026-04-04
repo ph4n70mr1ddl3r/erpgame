@@ -5,6 +5,7 @@ pub mod competitors;
 pub mod csr;
 pub mod ecommerce;
 pub mod economy;
+pub mod employees;
 pub mod events;
 pub mod executive_ai;
 pub mod loyalty;
